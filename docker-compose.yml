@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: cadweb_db
+    environment:
+      POSTGRES_DB: cadweb
+      POSTGRES_USER: cadweb
+      POSTGRES_PASSWORD: cadweb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  api:
+    build: ./api
+    container_name: cadweb_api
+    environment:
+      DATABASE_URL: postgresql+psycopg://cadweb:cadweb@db:5432/cadweb
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  web:
+    build: ./web
+    container_name: cadweb_web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  db_data:
