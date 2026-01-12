@@ -5,9 +5,13 @@ from sqlalchemy import text
 
 from app.db import engine, init_db
 from app.routers import parcels
+from app.routers import groups
+from app.routers import wms_proxy
 
 app = FastAPI(title="CadWeb API", version="0.1.0")
 app.include_router(parcels.router)
+app.include_router(groups.router)
+app.include_router(wms_proxy.router)
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 
