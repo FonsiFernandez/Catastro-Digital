@@ -8,6 +8,8 @@ ENV PYTHONUNBUFFERED=1
 # Dependencias para psycopg (binario) y salud básica
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    gdal-bin \
+    libgdal-dev \
   && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
