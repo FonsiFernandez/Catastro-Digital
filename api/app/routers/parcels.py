@@ -7,6 +7,8 @@ from typing import Optional
 from app.db import engine
 from app.services.catastro_wfs import fetch_parcel_gml
 from app.services.gml_to_geojson import gml_text_to_geojson_feature
+from app.services.catastro_circuit import is_denied, remaining_seconds, reason as deny_reason
+from app.services.catastro_circuit import deny_for
 
 router = APIRouter(prefix="/parcels", tags=["parcels"])
 
@@ -62,10 +64,23 @@ async def lookup_parcel(payload: ParcelLookupRequest):
                 }
             }
 
+    if is_denied():
+        raise HTTPException(
+            status_code=503,
+            detail=f"Catastro bloqueado temporalmente por rate-limit. Reintenta en ~{remaining_seconds()}s. Motivo: {deny_reason()}",
+    )
+
     # 2) Catastro WFS (GML/XML)
     try:
         xml_text, srs_used = await fetch_parcel_gml(rc14)
     except Exception as e:
+        msg = str(e)
+        if "Ha superado el limite de peticiones por hora" in msg or "Peticion denegada" in msg:
+            deny_for(60 * 60, "Límite de peticiones por hora (Catastro)")
+            raise HTTPException(
+                status_code=503,
+                detail="Catastro ha denegado por límite de peticiones por hora. He bloqueado llamadas externas durante 60 minutos para no gastar más intentos.",
+            )
         raise HTTPException(status_code=502, detail=f"Error llamando WFS Catastro: {e}")
 
     # 3) Convertir a GeoJSON y reproyectar a EPSG:4326
