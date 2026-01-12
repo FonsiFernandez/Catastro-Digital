@@ -25,7 +25,7 @@ export default function CadMap() {
 
     // UI state
     const [rcInput, setRcInput] = useState("36034A09800089");
-    const [showCatastro, setShowCatastro] = useState(true);
+    const [showCatastro, setShowCatastro] = useState(false);
     const [includeDeleted, setIncludeDeleted] = useState(false);
 
     const [groups, setGroups] = useState<Group[]>([]);
@@ -128,16 +128,11 @@ export default function CadMap() {
     const ensureCatastroLayer = (map: MapLibreMap) => {
         if (map.getSource("catastro-wms")) return;
 
-        // 512 para más definición (ya lo probaste)
+        // IMPORTANTE: usar proxy (evita CORS)
         map.addSource("catastro-wms", {
             type: "raster",
             tiles: [
-                `${CATASTRO_WMS}?service=WMS&request=GetMap&version=1.3.0` +
-                `&layers=CP.CadastralParcel` +
-                `&styles=CP.CadastralParcel.BoundariesOnly` +
-                `&format=image/png&transparent=true` +
-                `&crs=EPSG:3857` +
-                `&bbox={bbox-epsg-3857}&width=512&height=512`,
+                `${apiUrl}/wms/catastro?bbox={bbox-epsg-3857}&width=512&height=512`,
             ],
             tileSize: 512,
         });
@@ -263,13 +258,15 @@ export default function CadMap() {
         mapRef.current = map;
 
         map.on("load", () => {
-            ensureCatastroLayer(map);
-            setCatastroVisibility(map, showCatastro);
+            // Catastro SOLO si está activo
+            if (showCatastro) {
+                ensureCatastroLayer(map);
+                setCatastroVisibility(map, true);
+            }
 
             ensureParcelsLayers(map);
             setParcelsData(map, visibleParcels);
 
-            // click para seleccionar una parcela
             map.on("click", "parcels-fill", (e) => {
                 const feats = e.features as any[] | undefined;
                 if (!feats || feats.length === 0) return;
@@ -298,12 +295,18 @@ export default function CadMap() {
     useEffect(() => {
         const map = mapRef.current;
         if (!map || !map.isStyleLoaded()) return;
-        ensureCatastroLayer(map);
-        setCatastroVisibility(map, showCatastro);
-        // re-orden
-        if (map.getLayer("parcels-fill")) map.moveLayer("parcels-fill");
-        if (map.getLayer("parcels-line")) map.moveLayer("parcels-line");
-        if (map.getLayer("parcel-selected-line")) map.moveLayer("parcel-selected-line");
+
+        if (showCatastro) {
+            ensureCatastroLayer(map);
+            setCatastroVisibility(map, true);
+
+            // asegura orden: catastro debajo, parcelas encima
+            if (map.getLayer("parcels-fill")) map.moveLayer("parcels-fill");
+            if (map.getLayer("parcels-line")) map.moveLayer("parcels-line");
+            if (map.getLayer("parcel-selected-line")) map.moveLayer("parcel-selected-line");
+        } else {
+            setCatastroVisibility(map, false);
+        }
     }, [showCatastro]);
 
     // seleccion -> filtro y fit
