@@ -458,7 +458,7 @@ export default function CadMap() {
                 }}
             >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                    <div style={{ fontWeight: 700 }}>CadWeb</div>
+                    <div style={{ fontWeight: 700 }}>Lista Parcelas</div>
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                         <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
                             <input type="checkbox" checked={showCatastro} onChange={(e) => setShowCatastro(e.target.checked)} />
