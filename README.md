@@ -1,7 +1,16 @@
 # CadWeb – Visor personal del Catastro
+# CadWeb – Personal Cadastre Viewer
+
+CadWeb is a **personal web application** designed to query, store, and manage cadastral parcels in Spain.
+
+It allows users to search for parcels by cadastral reference, visualize them on a map, organize them into groups, and assign custom colors and names. The app maintains a persistent history, avoiding unnecessary repeated calls to the official Cadastre services.
+
+Designed for private use, CadWeb operates without a login system and focuses on stability, efficient caching, and controlled external requests.
 
 CadWeb es una **aplicación web personal** para consultar, guardar y gestionar parcelas catastrales en España.  
 Permite buscar parcelas por **referencia catastral**, visualizarlas en un mapa, organizarlas por grupos, asignar colores y nombres, y mantener un historial persistente sin repetir llamadas innecesarias a los servicios oficiales del Catastro.
+
+---
 
 La aplicación está pensada para **uso privado**, sin sistema de login, con foco en estabilidad, caché y control de peticiones externas.
 
