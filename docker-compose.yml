@@ -3,40 +3,63 @@ services:
     image: postgis/postgis:16-3.4
     container_name: cadweb_db
     environment:
-      POSTGRES_DB: cadweb
-      POSTGRES_USER: cadweb
-      POSTGRES_PASSWORD: cadweb
+      POSTGRES_DB: ${POSTGRES_DB:-cadweb}
+      POSTGRES_USER: ${POSTGRES_USER:-cadweb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cadweb}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U cadweb -d cadweb" ]
-      interval: 3s
-      timeout: 3s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cadweb} -d ${POSTGRES_DB:-cadweb}"]
+      interval: 5s
+      timeout: 5s
       retries: 20
+    restart: unless-stopped
 
   api:
-    build: ./api
+    build:
+      context: ./api
+    image: catastro-digital-api
     container_name: cadweb_api
     environment:
-      DATABASE_URL: postgresql+psycopg://cadweb:cadweb@db:5432/cadweb
-      CORS_ORIGINS: http://localhost:3000
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-cadweb}:${POSTGRES_PASSWORD:-cadweb}@db:5432/${POSTGRES_DB:-cadweb}
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-3000},http://127.0.0.1:${WEB_PORT:-3000}
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        INTERNAL_API_URL: http://api:8000
+    image: catastro-digital-web
     container_name: cadweb_web
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      INTERNAL_API_URL: http://api:8000
+      NEXT_TELEMETRY_DISABLED: "1"
     ports:
-      - "3000:3000"
+      - "${WEB_PORT:-3000}:3000"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
 
 volumes:
   db_data:

@@ -1,39 +1,49 @@
+from __future__ import annotations
+
 import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
 
-from app.db import engine, init_db
-from app.routers import parcels
-from app.routers import groups
-from app.routers import wms_proxy
+from .db import init_db
+from .routers import groups, parcels, wms_proxy
 
-app = FastAPI(title="CadWeb API", version="0.1.0")
+
+def _cors_origins() -> list[str]:
+    raw = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    )
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(
+    title="Catastro Digital API",
+    version="1.0.0",
+    description="API for cadastral parcel lookup, organisation and map proxying.",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins(),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
 app.include_router(parcels.router)
 app.include_router(groups.router)
 app.include_router(wms_proxy.router)
 
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[o.strip() for o in cors_origins],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.on_event("startup")
-def on_startup() -> None:
-    init_db()
-
-@app.get("/health")
-def health():
-    # Comprueba conexión DB
-    with engine.connect() as conn:
-        conn.execute(text("SELECT 1;"))
+@app.get("/health", tags=["system"])
+def health() -> dict[str, str]:
     return {"status": "ok"}
-
-@app.get("/")
-def root():
-    return {"message": "CadWeb API running"}
