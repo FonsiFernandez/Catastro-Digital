@@ -6,15 +6,18 @@ interactive MapLibre map.
 
 ## What changed in this version
 
-### Catastro Digital 1.2
+### Catastro Digital 1.3 — Land & Field Mode
 
-- Add parcels directly from the map: activate **Añadir desde mapa**, click inside a cadastral parcel, review the highlighted boundary and save it.
-- Existing saved parcels are detected locally before Catastro is queried.
-- Three base-map views: **Mapa (OpenStreetMap)**, **Ortofoto PNOA máxima actualidad**, and **Topográfico IGN**.
-- Selecting from the map automatically enables the cadastral boundary overlay.
-- The selected basemap is persisted in `localStorage`.
-- A temporary preview layer makes it clear which cadastral polygon will be saved.
-
+- Every saved parcel now includes live PostGIS measurements: **m², hectares and perimeter**.
+- Groups show their total active area, turning groups into useful land holdings rather than simple folders.
+- The sidebar includes a compact **Terrenos guardados** summary for the complete portfolio.
+- Parcel details now support free-form **terrain notes** (accesses, walls, paths, crops, observations, etc.).
+- **Field mode** tracks the phone GPS continuously and draws the reported accuracy area on the map.
+- When no parcel is selected, field mode automatically detects the saved parcel containing the user, or the nearest saved parcel within 500 m.
+- When a parcel is selected, field mode follows that parcel instead.
+- The map draws a guide from the current GPS position to the closest point on the cadastral boundary and reports the distance in metres.
+- PNOA aerial imagery and cadastral boundaries remain enabled for field inspection.
+- Backup format v2 includes parcel notes while imports remain compatible with v1 backups.
 
 ### Frontend
 
@@ -29,10 +32,10 @@ interactive MapLibre map.
 - Search validation, loading states, notifications and request timeouts.
 - Collapsible groups with show/hide, rename and delete actions.
 - Parcel filtering by name/reference.
-- Dedicated parcel inspector for name, group, color, copy reference, center, delete and restore.
+- Dedicated parcel inspector for name, notes, land metrics, group, color, copy reference, center, delete and restore.
 - Optimistic updates for fast editing, followed by server reconciliation.
 - Layer and deleted-parcel preferences persist in `localStorage`.
-- Responsive mobile layout.
+- Responsive mobile layout plus a map-first field mode for GPS use.
 - OpenStreetMap base tiles are defined directly in MapLibre instead of depending on a remote style JSON.
 
 ### API / database
@@ -189,9 +192,9 @@ Do not replace this with a `new URL(..., import.meta.url)` worker setup in Next.
 
 ## Backups and data portability
 
-Catastro Digital 1.1 adds backup and restore directly to the sidebar under **Datos y copias**.
+Catastro Digital includes backup and restore directly in the sidebar under **Datos y copias**.
 
-- **Backup** downloads a versioned `catastro-digital-backup_YYYY-MM-DD_HHMM.json` file containing all groups and all parcels, including deleted parcels, styles, group assignments, timestamps and full WGS84 geometry.
+- **Backup** downloads a versioned `catastro-digital-backup_YYYY-MM-DD_HHMM.json` file containing all groups and all parcels, including deleted parcels, names, notes, styles, group assignments, timestamps and full WGS84 geometry.
 - **GeoJSON** downloads all parcel geometries and useful properties for GIS interoperability. GeoJSON is an export format, not the restore format.
 - **Importar** accepts Catastro Digital backup JSON files. The backend validates the complete document and every geometry before writing anything.
 - **Combinar** upserts the objects present in the backup while leaving other current data untouched.

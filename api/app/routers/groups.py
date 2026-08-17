@@ -29,13 +29,36 @@ def _validate_group_id(group_id: str) -> str:
 
 @router.get("")
 def list_groups() -> dict[str, list[dict[str, object]]]:
+    """Return groups together with live land metrics for their active parcels."""
+
     with engine.begin() as conn:
         rows = conn.execute(
             text(
                 """
-                SELECT id::text AS id, name, is_hidden
-                FROM parcel_groups
-                ORDER BY created_at ASC, name ASC
+                SELECT
+                    g.id::text AS id,
+                    g.name,
+                    g.is_hidden,
+                    COALESCE(stats.parcel_count, 0)::int AS parcel_count,
+                    COALESCE(stats.area_m2, 0)::double precision AS area_m2,
+                    COALESCE(stats.area_m2, 0)::double precision / 10000.0 AS area_ha,
+                    COALESCE(stats.perimeter_m, 0)::double precision AS perimeter_m
+                FROM parcel_groups g
+                LEFT JOIN LATERAL (
+                    SELECT
+                        COUNT(*)::int AS parcel_count,
+                        SUM(ST_Area(p.geom_official::geography)) AS area_m2,
+                        CASE
+                            WHEN COUNT(*) = 0 THEN 0
+                            ELSE ST_Perimeter(
+                                ST_UnaryUnion(ST_Collect(p.geom_official))::geography
+                            )
+                        END AS perimeter_m
+                    FROM parcels p
+                    WHERE p.group_id = g.id
+                      AND p.is_deleted = FALSE
+                ) stats ON TRUE
+                ORDER BY g.created_at ASC, g.name ASC
                 """
             )
         ).mappings().all()
@@ -61,7 +84,13 @@ def create_group(payload: GroupCreate) -> dict[str, object]:
             {"name": name},
         ).mappings().one()
 
-    return dict(row)
+    return {
+        **dict(row),
+        "parcel_count": 0,
+        "area_m2": 0.0,
+        "area_ha": 0.0,
+        "perimeter_m": 0.0,
+    }
 
 
 @router.patch("/{group_id}")

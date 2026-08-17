@@ -1748,3 +1748,454 @@ svg {
     margin-left: 0;
   }
 }
+
+/* Land metrics ----------------------------------------------------------- */
+.land-summary {
+  margin: 0 17px 13px;
+  padding: 10px 11px;
+  border: 1px solid var(--primary-border);
+  border-radius: 11px;
+  background: linear-gradient(145deg, #f7fbf8, #eef5f1);
+}
+
+.land-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.land-summary-icon {
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--primary);
+  background: rgba(54, 95, 75, 0.1);
+}
+
+.land-summary-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.land-summary-head > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.land-summary-head strong {
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.land-summary-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(54, 95, 75, 0.12);
+  color: var(--text-muted);
+  font-size: 8.5px;
+}
+
+.land-summary-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.land-summary-stats b {
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.land-summary-stats svg {
+  width: 11px;
+  height: 11px;
+}
+
+.group-area {
+  margin-left: auto;
+  padding-left: 6px;
+  color: var(--primary);
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.parcel-row {
+  grid-template-columns: 6px minmax(0, 1fr) auto auto;
+}
+
+.parcel-area {
+  color: var(--primary);
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.parcel-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 11px;
+}
+
+.metric-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-subtle);
+}
+
+.metric-card.metric-primary {
+  border-color: var(--primary-border);
+  background: var(--primary-soft);
+}
+
+.metric-card > span {
+  color: var(--text-muted);
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.metric-card strong {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-card strong svg {
+  width: 12px;
+  height: 12px;
+}
+
+.metric-card small {
+  color: var(--text-muted);
+  font-size: 7.5px;
+}
+
+.notes-field textarea {
+  width: 100%;
+  min-height: 62px;
+  resize: vertical;
+  padding: 7px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  outline: 0;
+  color: var(--text);
+  background: white;
+  font: inherit;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.notes-field textarea:focus {
+  border-color: #87a493;
+  box-shadow: 0 0 0 3px rgba(54, 95, 75, 0.08);
+}
+
+.notes-field textarea:disabled {
+  color: var(--text-muted);
+  background: #f1f3f2;
+}
+
+/* Field mode ------------------------------------------------------------- */
+.field-mode-trigger {
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.24);
+  background: rgba(248, 250, 255, 0.96);
+}
+
+.field-panel-overlay {
+  position: absolute;
+  left: 13px;
+  bottom: 13px;
+  z-index: 15;
+  width: min(410px, calc(100% - 92px));
+}
+
+.field-panel {
+  overflow: hidden;
+  border: 1px solid rgba(209, 213, 219, 0.96);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.field-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px 9px;
+  border-bottom: 1px solid var(--border);
+}
+
+.field-title-block {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.field-kicker {
+  color: #2563eb;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.field-title-block strong {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.field-error {
+  margin: 9px 11px;
+  padding: 8px 9px;
+  border: 1px solid #f4c7c3;
+  border-radius: 8px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.field-gps-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 0;
+  color: var(--text-muted);
+  font-size: 8.5px;
+}
+
+.field-gps-row span:last-child:not(:first-child) {
+  margin-left: auto;
+}
+
+.field-gps-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.field-target-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  margin: 9px 11px 0;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-subtle);
+}
+
+.field-target-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.field-target-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.field-target-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.field-target-main > span {
+  color: var(--text-muted);
+  font-size: 7.5px;
+  font-weight: 650;
+}
+
+.field-target-main strong {
+  overflow: hidden;
+  margin-top: 1px;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-target-main small {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 8px;
+}
+
+.field-state {
+  padding: 4px 6px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.field-state.is-inside {
+  color: #18794e;
+  background: #eaf7ef;
+}
+
+.field-state.is-outside {
+  color: #b45309;
+  background: #fff6df;
+}
+
+.field-distance-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  margin: 8px 11px 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 10px;
+  background: #fffbeb;
+}
+
+.field-distance-card > span {
+  align-self: center;
+  color: #92400e;
+  font-size: 8.5px;
+  font-weight: 650;
+}
+
+.field-distance-card strong {
+  color: #78350f;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.field-distance-card small {
+  grid-column: 1 / -1;
+  color: #a16207;
+  font-size: 7.5px;
+  line-height: 1.35;
+}
+
+.field-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 9px 11px 11px;
+}
+
+.field-actions .secondary-button {
+  flex: 1 1 auto;
+}
+
+.field-link-button {
+  flex: 1 0 100%;
+  padding: 5px;
+  border: 0;
+  color: #2563eb;
+  background: transparent;
+  cursor: pointer;
+  font-size: 8.5px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.field-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 10px 11px 11px;
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  color: var(--text-muted);
+  background: var(--panel-subtle);
+}
+
+.field-empty strong {
+  color: var(--text-soft);
+  font-size: 10px;
+}
+
+.field-empty span {
+  font-size: 8.5px;
+  line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+  .land-summary {
+    display: none;
+  }
+
+  .group-area {
+    font-size: 7.5px;
+  }
+
+  .field-mode-active .cad-sidebar {
+    display: none;
+  }
+
+  .field-panel-overlay {
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+  }
+
+  .field-panel {
+    border-radius: 16px;
+  }
+
+  .field-panel-head {
+    padding: 12px 13px 10px;
+  }
+
+  .field-target-card,
+  .field-distance-card {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .field-actions {
+    padding: 10px 12px 12px;
+  }
+
+  .field-mode-active .maplibregl-ctrl-bottom-right {
+    bottom: 225px;
+  }
+
+  .field-mode-active .map-floating-bar {
+    top: 9px;
+    left: 9px;
+  }
+
+  .field-mode-active .map-floating-bar .map-action,
+  .field-mode-active .map-floating-bar .map-status {
+    display: none;
+  }
+}

@@ -5,7 +5,7 @@ from datetime import datetime
 
 from geoalchemy2 import Geometry
 from geoalchemy2.elements import WKBElement
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, func, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -46,6 +46,7 @@ class Parcel(Base):
 
     cadastral_ref: Mapped[str] = mapped_column(String(20), primary_key=True)
     name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     color: Mapped[str] = mapped_column(
         String(7),
         nullable=False,

@@ -26,8 +26,8 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Catastro Digital API",
-    version="1.1.0",
-    description="API for cadastral parcel lookup, organisation and map proxying.",
+    version="1.3.0",
+    description="API for cadastral parcel lookup, land metrics, field navigation, organisation and map proxying.",
     lifespan=lifespan,
 )
 

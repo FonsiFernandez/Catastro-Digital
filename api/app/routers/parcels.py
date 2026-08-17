@@ -20,6 +20,7 @@ router = APIRouter(prefix="/parcels", tags=["parcels"])
 RC_RE = re.compile(r"^[0-9A-Z]{14,20}$")
 COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 DEFAULT_COLOR = "#7c3aed"
+FIELD_SEARCH_RADIUS_M = 500.0
 
 
 class ParcelLookupRequest(BaseModel):
@@ -31,8 +32,17 @@ class ParcelIdentifyRequest(BaseModel):
     latitude: float = Field(ge=27.0, le=45.0)
 
 
+class FieldPositionRequest(BaseModel):
+    # GPS tracking itself is global. Saved Catastro parcels are Spanish, so a
+    # position elsewhere simply returns no nearby target instead of a 422.
+    longitude: float = Field(ge=-180.0, le=180.0)
+    latitude: float = Field(ge=-90.0, le=90.0)
+    selected_ref: str | None = Field(default=None, min_length=14, max_length=20)
+
+
 class ParcelUpdateRequest(BaseModel):
     name: str | None = Field(default=None, max_length=160)
+    notes: str | None = Field(default=None, max_length=4000)
     color: str | None = None
     group_id: str | None = None
     is_deleted: bool | None = None
@@ -65,8 +75,6 @@ def _extract_cadastral_ref(properties: dict[str, Any]) -> str | None:
         if RC_RE.fullmatch(candidate):
             return candidate
 
-    # Different GDAL/GML driver versions can prefix namespace names. As a
-    # defensive fallback, inspect all scalar property values for a valid RC.
     for value in properties.values():
         if isinstance(value, (str, int)):
             candidate = "".join(str(value).split()).upper()
@@ -86,13 +94,21 @@ def _catastro_error_is_rate_limit(message: str) -> bool:
     )
 
 
+def _metric(value: Any) -> float | None:
+    return None if value is None else float(value)
+
+
 def _row_to_feature(row: Any, *, source: str | None = None) -> dict[str, Any]:
     properties: dict[str, Any] = {
         "cadastral_ref": row["cadastral_ref"],
         "name": row["name"],
+        "notes": row.get("notes"),
         "color": row["color"],
         "group_id": str(row["group_id"]) if row["group_id"] else None,
         "is_deleted": row["is_deleted"],
+        "area_m2": _metric(row.get("area_m2")),
+        "area_ha": _metric(row.get("area_ha")),
+        "perimeter_m": _metric(row.get("perimeter_m")),
     }
     if source:
         properties["source"] = source
@@ -104,25 +120,33 @@ def _row_to_feature(row: Any, *, source: str | None = None) -> dict[str, Any]:
     }
 
 
+def _parcel_metrics_sql() -> str:
+    return """
+        ST_Area(geom_official::geography)::double precision AS area_m2,
+        (ST_Area(geom_official::geography) / 10000.0)::double precision AS area_ha,
+        ST_Perimeter(geom_official::geography)::double precision AS perimeter_m
+    """
+
+
 @router.post("/identify")
 async def identify_parcel(payload: ParcelIdentifyRequest) -> dict[str, Any]:
     """Identify the cadastral parcel underneath a map click without saving it."""
 
     point_wkt = f"POINT({payload.longitude} {payload.latitude})"
 
-    # Saved parcels are resolved locally first. This makes repeated clicks instant
-    # and avoids spending Catastro WFS requests unnecessarily.
     with engine.begin() as conn:
         row = conn.execute(
             text(
-                """
+                f"""
                 SELECT
                     cadastral_ref,
                     name,
+                    notes,
                     color,
                     group_id,
                     is_deleted,
-                    ST_AsGeoJSON(geom_official) AS geom
+                    ST_AsGeoJSON(geom_official) AS geom,
+                    {_parcel_metrics_sql()}
                 FROM parcels
                 WHERE ST_Covers(
                     geom_official,
@@ -193,16 +217,15 @@ async def identify_parcel(payload: ParcelIdentifyRequest) -> dict[str, Any]:
             detail="No se pudo identificar una parcela exactamente bajo ese punto",
         )
 
-    # A click on a shared boundary can technically match more than one feature.
-    # The smallest covering polygon is the least surprising choice for selection.
     _, feature, rc = min(matches, key=lambda item: item[0])
 
     with engine.begin() as conn:
         saved_row = conn.execute(
             text(
-                """
-                SELECT cadastral_ref, name, color, group_id, is_deleted,
-                       ST_AsGeoJSON(geom_official) AS geom
+                f"""
+                SELECT cadastral_ref, name, notes, color, group_id, is_deleted,
+                       ST_AsGeoJSON(geom_official) AS geom,
+                       {_parcel_metrics_sql()}
                 FROM parcels
                 WHERE cadastral_ref = :rc OR LEFT(cadastral_ref, 14) = :rc14
                 ORDER BY (cadastral_ref = :rc) DESC, updated_at DESC
@@ -221,13 +244,124 @@ async def identify_parcel(payload: ParcelIdentifyRequest) -> dict[str, Any]:
     feature["properties"] = {
         "cadastral_ref": rc,
         "name": None,
+        "notes": None,
         "color": "#f59e0b",
         "group_id": None,
         "is_deleted": False,
+        "area_m2": None,
+        "area_ha": None,
+        "perimeter_m": None,
         "source": "catastro_wfs_bbox",
         "srs_in": srs_used,
     }
     return {"parcel": feature, "already_saved": False}
+
+
+@router.post("/field-position")
+def field_position(payload: FieldPositionRequest) -> dict[str, Any]:
+    """Resolve a live GPS position against a selected or nearby saved parcel.
+
+    When selected_ref is provided it is always the target. Otherwise the endpoint
+    prefers a parcel covering the user's position and falls back to the nearest
+    saved parcel within FIELD_SEARCH_RADIUS_M.
+    """
+
+    selected_rc = _normalise_rc(payload.selected_ref) if payload.selected_ref else None
+    params = {
+        "longitude": payload.longitude,
+        "latitude": payload.latitude,
+        "selected_rc": selected_rc or "",
+        "selected_rc14": selected_rc[:14] if selected_rc else "",
+        "has_selected": selected_rc is not None,
+        "allow_rc14": bool(selected_rc and len(selected_rc) == 14),
+        "radius_m": FIELD_SEARCH_RADIUS_M,
+    }
+
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                """
+                WITH position AS (
+                    SELECT ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326) AS pt
+                ), target AS (
+                    SELECT p.*
+                    FROM parcels p, position pos
+                    WHERE p.is_deleted = FALSE
+                      AND (
+                        (
+                          :has_selected = TRUE
+                          AND (
+                            p.cadastral_ref = :selected_rc
+                            OR (:allow_rc14 = TRUE AND LEFT(p.cadastral_ref, 14) = :selected_rc14)
+                          )
+                        )
+                        OR (
+                          :has_selected = FALSE
+                          AND ST_DWithin(
+                            p.geom_official::geography,
+                            pos.pt::geography,
+                            :radius_m
+                          )
+                        )
+                      )
+                    ORDER BY
+                      CASE
+                        WHEN :has_selected = TRUE THEN
+                          CASE WHEN p.cadastral_ref = :selected_rc THEN 0 ELSE 1 END
+                        ELSE
+                          CASE WHEN ST_Covers(p.geom_official, pos.pt) THEN 0 ELSE 1 END
+                      END,
+                      CASE
+                        WHEN :has_selected = TRUE THEN 0
+                        ELSE ST_Distance(p.geom_official::geography, pos.pt::geography)
+                      END,
+                      p.updated_at DESC
+                    LIMIT 1
+                )
+                SELECT
+                    t.cadastral_ref,
+                    t.name,
+                    t.notes,
+                    t.color,
+                    t.group_id,
+                    t.is_deleted,
+                    g.name AS group_name,
+                    ST_AsGeoJSON(t.geom_official) AS geom,
+                    ST_Area(t.geom_official::geography)::double precision AS area_m2,
+                    (ST_Area(t.geom_official::geography) / 10000.0)::double precision AS area_ha,
+                    ST_Perimeter(t.geom_official::geography)::double precision AS perimeter_m,
+                    ST_Covers(t.geom_official, pos.pt) AS inside,
+                    ST_Distance(
+                        ST_Boundary(t.geom_official)::geography,
+                        pos.pt::geography
+                    )::double precision AS boundary_distance_m,
+                    ST_AsGeoJSON(
+                        ST_ClosestPoint(ST_Boundary(t.geom_official), pos.pt)
+                    ) AS nearest_boundary
+                FROM target t
+                CROSS JOIN position pos
+                LEFT JOIN parcel_groups g ON g.id = t.group_id
+                """
+            ),
+            params,
+        ).mappings().first()
+
+    if not row:
+        return {
+            "target": None,
+            "search_radius_m": FIELD_SEARCH_RADIUS_M,
+        }
+
+    return {
+        "target": {
+            "parcel": _row_to_feature(row, source="field"),
+            "group_name": row["group_name"],
+            "inside": bool(row["inside"]),
+            "boundary_distance_m": float(row["boundary_distance_m"]),
+            "nearest_boundary": json.loads(row["nearest_boundary"]),
+        },
+        "search_radius_m": FIELD_SEARCH_RADIUS_M,
+    }
 
 
 @router.post("/lookup")
@@ -235,19 +369,19 @@ async def lookup_parcel(payload: ParcelLookupRequest) -> dict[str, Any]:
     rc = _normalise_rc(payload.cadastral_ref)
     rc14 = rc[:14]
 
-    # Prefer the exact reference but accept an already cached 20-char variant for
-    # a 14-char search. This avoids unnecessary calls to Catastro.
     with engine.begin() as conn:
         row = conn.execute(
             text(
-                """
+                f"""
                 SELECT
                     cadastral_ref,
                     name,
+                    notes,
                     color,
                     group_id,
                     is_deleted,
-                    ST_AsGeoJSON(geom_official) AS geom
+                    ST_AsGeoJSON(geom_official) AS geom,
+                    {_parcel_metrics_sql()}
                 FROM parcels
                 WHERE cadastral_ref = :rc OR LEFT(cadastral_ref, 14) = :rc14
                 ORDER BY (cadastral_ref = :rc) DESC, updated_at DESC
@@ -270,14 +404,10 @@ async def lookup_parcel(payload: ParcelLookupRequest) -> dict[str, Any]:
         )
 
     try:
-        xml_text, srs_used = await fetch_parcel_gml(rc14)
+        xml_text, _srs_used = await fetch_parcel_gml(rc14)
     except Exception as exc:
         message = str(exc)
-        if (
-            "Ha superado el limite de peticiones por hora" in message
-            or "Peticion denegada" in message
-            or "Petición denegada" in message
-        ):
+        if _catastro_error_is_rate_limit(message):
             deny_for(60 * 60, "Límite de peticiones por hora (Catastro)")
             raise HTTPException(
                 status_code=503,
@@ -326,18 +456,20 @@ async def lookup_parcel(payload: ParcelLookupRequest) -> dict[str, Any]:
             ),
             {"rc": rc, "geom": geom_json, "color": DEFAULT_COLOR},
         )
+        saved_row = conn.execute(
+            text(
+                f"""
+                SELECT cadastral_ref, name, notes, color, group_id, is_deleted,
+                       ST_AsGeoJSON(geom_official) AS geom,
+                       {_parcel_metrics_sql()}
+                FROM parcels
+                WHERE cadastral_ref = :rc
+                """
+            ),
+            {"rc": rc},
+        ).mappings().one()
 
-    feature["properties"] = {
-        **feature.get("properties", {}),
-        "cadastral_ref": rc,
-        "name": None,
-        "color": DEFAULT_COLOR,
-        "group_id": None,
-        "is_deleted": False,
-        "source": "catastro_wfs_gml",
-        "srs_in": srs_used,
-    }
-    return {"parcel": feature}
+    return {"parcel": _row_to_feature(saved_row, source="catastro_wfs_gml")}
 
 
 @router.get("")
@@ -345,14 +477,16 @@ def list_parcels(include_deleted: bool = Query(False)) -> dict[str, Any]:
     with engine.begin() as conn:
         rows = conn.execute(
             text(
-                """
+                f"""
                 SELECT
                     cadastral_ref,
                     name,
+                    notes,
                     color,
                     group_id,
                     is_deleted,
-                    ST_AsGeoJSON(geom_official) AS geom
+                    ST_AsGeoJSON(geom_official) AS geom,
+                    {_parcel_metrics_sql()}
                 FROM parcels
                 WHERE (:include_deleted = TRUE OR is_deleted = FALSE)
                 ORDER BY updated_at DESC, cadastral_ref ASC
@@ -392,6 +526,9 @@ def update_parcel(rc: str, payload: ParcelUpdateRequest) -> dict[str, bool]:
             raise HTTPException(status_code=400, detail="El grupo indicado no existe")
 
     name = payload.name.strip() if payload.name is not None else None
+    notes = payload.notes.strip() if payload.notes is not None else None
+    if notes == "":
+        notes = None
 
     with engine.begin() as conn:
         result = conn.execute(
@@ -400,6 +537,7 @@ def update_parcel(rc: str, payload: ParcelUpdateRequest) -> dict[str, bool]:
                 UPDATE parcels
                 SET
                     name = CASE WHEN :name_is_set THEN :name ELSE name END,
+                    notes = CASE WHEN :notes_is_set THEN :notes ELSE notes END,
                     color = COALESCE(:color, color),
                     group_id = CASE
                         WHEN :group_id_is_set THEN CAST(NULLIF(:group_id, '') AS uuid)
@@ -421,6 +559,8 @@ def update_parcel(rc: str, payload: ParcelUpdateRequest) -> dict[str, bool]:
                 "allow_rc14_fallback": len(normalised_rc) == 14,
                 "name_is_set": "name" in payload.model_fields_set,
                 "name": name,
+                "notes_is_set": "notes" in payload.model_fields_set,
+                "notes": notes,
                 "color": color,
                 "group_id_is_set": "group_id" in payload.model_fields_set,
                 "group_id": group_id if group_id is not None else "",

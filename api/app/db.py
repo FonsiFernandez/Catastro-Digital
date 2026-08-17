@@ -49,6 +49,7 @@ def _upgrade_legacy_schema() -> None:
         """
         ALTER TABLE parcels
           ADD COLUMN IF NOT EXISTS name VARCHAR(160),
+          ADD COLUMN IF NOT EXISTS notes TEXT,
           ADD COLUMN IF NOT EXISTS color VARCHAR(7) DEFAULT '#7c3aed',
           ADD COLUMN IF NOT EXISTS group_id UUID,
           ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
