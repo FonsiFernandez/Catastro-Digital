@@ -8,11 +8,12 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from shapely.geometry import Point, shape
 
 from app.db import engine
 from app.services.catastro_circuit import deny_for, is_denied, reason as deny_reason, remaining_seconds
-from app.services.catastro_wfs import fetch_parcel_gml
-from app.services.gml_to_geojson import gml_text_to_geojson_feature
+from app.services.catastro_wfs import fetch_parcel_gml, fetch_parcels_around_point_gml
+from app.services.gml_to_geojson import gml_text_to_geojson_feature, gml_text_to_geojson_features
 
 router = APIRouter(prefix="/parcels", tags=["parcels"])
 
@@ -23,6 +24,11 @@ DEFAULT_COLOR = "#7c3aed"
 
 class ParcelLookupRequest(BaseModel):
     cadastral_ref: str = Field(min_length=14, max_length=20)
+
+
+class ParcelIdentifyRequest(BaseModel):
+    longitude: float = Field(ge=-19.0, le=5.0)
+    latitude: float = Field(ge=27.0, le=45.0)
 
 
 class ParcelUpdateRequest(BaseModel):
@@ -42,6 +48,44 @@ def _normalise_rc(value: str) -> str:
     return rc
 
 
+def _extract_cadastral_ref(properties: dict[str, Any]) -> str | None:
+    """Find the cadastral reference in GDAL-flattened INSPIRE properties."""
+
+    preferred_keys = ("nationalcadastralreference", "localid")
+    normalised = {
+        re.sub(r"[^a-z0-9]", "", str(key).lower()): value
+        for key, value in properties.items()
+    }
+
+    for key in preferred_keys:
+        value = normalised.get(key)
+        if value is None:
+            continue
+        candidate = "".join(str(value).split()).upper()
+        if RC_RE.fullmatch(candidate):
+            return candidate
+
+    # Different GDAL/GML driver versions can prefix namespace names. As a
+    # defensive fallback, inspect all scalar property values for a valid RC.
+    for value in properties.values():
+        if isinstance(value, (str, int)):
+            candidate = "".join(str(value).split()).upper()
+            if RC_RE.fullmatch(candidate):
+                return candidate
+
+    return None
+
+
+def _catastro_error_is_rate_limit(message: str) -> bool:
+    lowered = message.lower()
+    return (
+        "limite de peticiones" in lowered
+        or "límite de peticiones" in lowered
+        or "peticion denegada" in lowered
+        or "petición denegada" in lowered
+    )
+
+
 def _row_to_feature(row: Any, *, source: str | None = None) -> dict[str, Any]:
     properties: dict[str, Any] = {
         "cadastral_ref": row["cadastral_ref"],
@@ -58,6 +102,132 @@ def _row_to_feature(row: Any, *, source: str | None = None) -> dict[str, Any]:
         "geometry": json.loads(row["geom"]),
         "properties": properties,
     }
+
+
+@router.post("/identify")
+async def identify_parcel(payload: ParcelIdentifyRequest) -> dict[str, Any]:
+    """Identify the cadastral parcel underneath a map click without saving it."""
+
+    point_wkt = f"POINT({payload.longitude} {payload.latitude})"
+
+    # Saved parcels are resolved locally first. This makes repeated clicks instant
+    # and avoids spending Catastro WFS requests unnecessarily.
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT
+                    cadastral_ref,
+                    name,
+                    color,
+                    group_id,
+                    is_deleted,
+                    ST_AsGeoJSON(geom_official) AS geom
+                FROM parcels
+                WHERE ST_Covers(
+                    geom_official,
+                    ST_GeomFromText(:point_wkt, 4326)
+                )
+                ORDER BY is_deleted ASC, updated_at DESC
+                LIMIT 1
+                """
+            ),
+            {"point_wkt": point_wkt},
+        ).mappings().first()
+
+    if row:
+        return {
+            "parcel": _row_to_feature(row, source="db"),
+            "already_saved": True,
+        }
+
+    if is_denied():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Catastro está bloqueado temporalmente por rate-limit. "
+                f"Reintenta en ~{remaining_seconds()}s. Motivo: {deny_reason()}"
+            ),
+        )
+
+    try:
+        xml_text, srs_used = await fetch_parcels_around_point_gml(
+            payload.longitude,
+            payload.latitude,
+        )
+        features = gml_text_to_geojson_features(xml_text)
+    except Exception as exc:
+        message = str(exc)
+        if _catastro_error_is_rate_limit(message):
+            deny_for(60 * 60, "Límite de peticiones por hora (Catastro)")
+            raise HTTPException(
+                status_code=503,
+                detail="Catastro ha limitado temporalmente las consultas desde el mapa",
+            ) from exc
+        if "sin features" in message.lower():
+            raise HTTPException(status_code=404, detail="No se encontró una parcela en ese punto") from exc
+        raise HTTPException(status_code=502, detail=f"Error identificando parcela en Catastro: {exc}") from exc
+
+    click_point = Point(payload.longitude, payload.latitude)
+    matches: list[tuple[float, dict[str, Any], str]] = []
+
+    for feature in features:
+        geometry = feature.get("geometry")
+        if not geometry:
+            continue
+        try:
+            polygon = shape(geometry)
+        except Exception:
+            continue
+        if polygon.is_empty or not polygon.covers(click_point):
+            continue
+
+        rc = _extract_cadastral_ref(feature.get("properties") or {})
+        if not rc:
+            continue
+        matches.append((polygon.area, feature, rc))
+
+    if not matches:
+        raise HTTPException(
+            status_code=404,
+            detail="No se pudo identificar una parcela exactamente bajo ese punto",
+        )
+
+    # A click on a shared boundary can technically match more than one feature.
+    # The smallest covering polygon is the least surprising choice for selection.
+    _, feature, rc = min(matches, key=lambda item: item[0])
+
+    with engine.begin() as conn:
+        saved_row = conn.execute(
+            text(
+                """
+                SELECT cadastral_ref, name, color, group_id, is_deleted,
+                       ST_AsGeoJSON(geom_official) AS geom
+                FROM parcels
+                WHERE cadastral_ref = :rc OR LEFT(cadastral_ref, 14) = :rc14
+                ORDER BY (cadastral_ref = :rc) DESC, updated_at DESC
+                LIMIT 1
+                """
+            ),
+            {"rc": rc, "rc14": rc[:14]},
+        ).mappings().first()
+
+    if saved_row:
+        return {
+            "parcel": _row_to_feature(saved_row, source="db"),
+            "already_saved": True,
+        }
+
+    feature["properties"] = {
+        "cadastral_ref": rc,
+        "name": None,
+        "color": "#f59e0b",
+        "group_id": None,
+        "is_deleted": False,
+        "source": "catastro_wfs_bbox",
+        "srs_in": srs_used,
+    }
+    return {"parcel": feature, "already_saved": False}
 
 
 @router.post("/lookup")

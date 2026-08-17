@@ -1250,3 +1250,501 @@ svg {
     padding-bottom: 11px;
   }
 }
+
+/* Data backup / import ----------------------------------------------------- */
+.data-tools {
+  position: relative;
+  margin: 0 18px 14px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.data-tools-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.data-tools-title {
+  margin: 0;
+}
+
+.data-tools-caption {
+  color: var(--text-muted);
+  font-size: 8.5px;
+  white-space: nowrap;
+}
+
+.data-tools-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.data-tool-button {
+  min-width: 0;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text-soft);
+  background: var(--panel-subtle);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 650;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.data-tool-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: #fff;
+}
+
+.data-tool-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.data-tool-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+.visually-hidden-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.import-card {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 7px);
+  left: 0;
+  right: 0;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.18);
+}
+
+.import-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.import-card-header > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.import-card-header strong {
+  color: var(--success);
+  font-size: 11px;
+}
+
+.import-card-header span {
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 8.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-close {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.import-close:hover {
+  background: var(--panel-subtle);
+}
+
+.import-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.import-summary > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 7px 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-subtle);
+}
+
+.import-summary strong {
+  font-size: 11px;
+}
+
+.import-summary span {
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: 8px;
+}
+
+.import-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.import-mode legend {
+  margin-bottom: 5px;
+  color: var(--text-soft);
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
+.import-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.import-option.selected {
+  border-color: #a9c6b6;
+  background: var(--primary-soft);
+}
+
+.import-option.danger-option.selected {
+  border-color: #e8bab5;
+  background: var(--danger-soft);
+}
+
+.import-option input {
+  margin: 2px 0 0;
+  accent-color: var(--primary);
+}
+
+.import-option span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.import-option strong {
+  font-size: 9.5px;
+}
+
+.import-option small {
+  color: var(--text-muted);
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+.replace-confirmation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 7px;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  font-size: 8.5px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.replace-confirmation input {
+  margin: 2px 0 0;
+  accent-color: var(--danger);
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.small-danger-button {
+  padding: 7px 9px;
+  border: 1px solid #e5aaa4;
+  border-radius: 8px;
+  color: white;
+  background: var(--danger);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.small-danger-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .data-tools {
+    margin: 0 11px 9px;
+    padding: 8px;
+  }
+
+  .data-tools-heading {
+    display: none;
+  }
+
+  .data-tool-button {
+    height: 31px;
+  }
+
+  .import-card {
+    top: auto;
+    bottom: calc(100% + 7px);
+  }
+}
+
+/* Basemap selector -------------------------------------------------------- */
+.base-map-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 9px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.base-map-field > span {
+  color: var(--text-soft);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.base-map-field select {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  outline: none;
+  color: var(--text);
+  background: white;
+  font-size: 10px;
+}
+
+.base-map-field select:focus {
+  border-color: #8ca998;
+  box-shadow: 0 0 0 3px rgba(54, 95, 75, 0.08);
+}
+
+.base-map-field small {
+  color: var(--text-muted);
+  font-size: 8.5px;
+  line-height: 1.35;
+}
+
+/* Click-to-save parcel picker ------------------------------------------- */
+.map-add-action {
+  color: var(--primary);
+  border-color: rgba(54, 95, 75, 0.28);
+  background: rgba(247, 252, 249, 0.96);
+}
+
+.map-add-action:hover:not(:disabled) {
+  background: white;
+  border-color: rgba(54, 95, 75, 0.45);
+}
+
+.cad-map-shell.is-identifying::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 3px rgba(54, 95, 75, 0.55);
+}
+
+.map-picker-overlay {
+  position: absolute;
+  top: 13px;
+  left: 13px;
+  z-index: 12;
+  width: min(390px, calc(100% - 92px));
+}
+
+.parcel-picker-banner,
+.parcel-picker-card {
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(12px);
+}
+
+.parcel-picker-banner {
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 9px 9px 11px;
+}
+
+.picker-symbol {
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.picker-symbol svg {
+  width: 16px;
+  height: 16px;
+}
+
+.parcel-picker-banner > div,
+.picker-card-head > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.parcel-picker-banner strong,
+.picker-card-head strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parcel-picker-banner span:not(.picker-symbol) {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.picker-close {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.picker-close:hover {
+  background: var(--panel-subtle);
+}
+
+.picker-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.parcel-picker-card {
+  padding: 11px;
+}
+
+.picker-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.parcel-picker-card p {
+  margin: 9px 2px 0 41px;
+  color: var(--text-muted);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 11px;
+}
+
+.picker-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.picker-primary svg {
+  width: 13px;
+  height: 13px;
+}
+
+@media (max-width: 720px) {
+  .base-map-field {
+    margin-bottom: 7px;
+    padding: 7px;
+  }
+
+  .base-map-field small {
+    display: none;
+  }
+
+  .map-picker-overlay {
+    top: 9px;
+    left: 9px;
+    width: min(380px, calc(100% - 72px));
+  }
+
+  .map-floating-bar .map-status {
+    display: none;
+  }
+
+  .parcel-picker-card p {
+    margin-left: 0;
+  }
+}

@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Any
 
 
-def gml_text_to_geojson_feature(xml_text: str) -> dict[str, Any]:
-    """Convert Catastro GML to a WGS84 GeoJSON feature using GDAL/ogr2ogr."""
+def gml_text_to_geojson_features(xml_text: str) -> list[dict[str, Any]]:
+    """Convert Catastro GML to WGS84 GeoJSON features using GDAL/ogr2ogr."""
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        in_path = Path(tmpdir) / "parcel.gml"
+        in_path = Path(tmpdir) / "parcels.gml"
         in_path.write_text(xml_text, encoding="latin-1", errors="ignore")
 
         command = [
@@ -42,4 +42,10 @@ def gml_text_to_geojson_feature(xml_text: str) -> dict[str, Any]:
         if not features:
             raise RuntimeError("Conversión GML→GeoJSON sin features")
 
-        return features[0]
+        return features
+
+
+def gml_text_to_geojson_feature(xml_text: str) -> dict[str, Any]:
+    """Convert Catastro GML to the first WGS84 GeoJSON feature."""
+
+    return gml_text_to_geojson_features(xml_text)[0]

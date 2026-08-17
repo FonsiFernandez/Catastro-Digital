@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import init_db
-from .routers import groups, parcels, wms_proxy
+from .routers import backup, groups, parcels, wms_proxy
 
 
 def _cors_origins() -> list[str]:
@@ -26,7 +26,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Catastro Digital API",
-    version="1.0.0",
+    version="1.1.0",
     description="API for cadastral parcel lookup, organisation and map proxying.",
     lifespan=lifespan,
 )
@@ -40,6 +40,7 @@ app.add_middleware(
 )
 
 app.include_router(parcels.router)
+app.include_router(backup.router)
 app.include_router(groups.router)
 app.include_router(wms_proxy.router)
 

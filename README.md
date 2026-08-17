@@ -6,6 +6,16 @@ interactive MapLibre map.
 
 ## What changed in this version
 
+### Catastro Digital 1.2
+
+- Add parcels directly from the map: activate **Añadir desde mapa**, click inside a cadastral parcel, review the highlighted boundary and save it.
+- Existing saved parcels are detected locally before Catastro is queried.
+- Three base-map views: **Mapa (OpenStreetMap)**, **Ortofoto PNOA máxima actualidad**, and **Topográfico IGN**.
+- Selecting from the map automatically enables the cadastral boundary overlay.
+- The selected basemap is persisted in `localStorage`.
+- A temporary preview layer makes it clear which cadastral polygon will be saved.
+
+
 ### Frontend
 
 - Next.js 16.3.1 and React 19.2.8.
@@ -123,7 +133,9 @@ uvicorn app.main:app --reload
 
 - Spanish Cadastre INSPIRE WFS for parcel geometries.
 - Spanish Cadastre WMS for cadastral boundary overlay.
-- OpenStreetMap raster tiles for the base map.
+- OpenStreetMap raster tiles for the street base map.
+- IGN/CNIG PNOA Máxima Actualidad orthoimagery for aerial terrain inspection.
+- IGN raster cartography for the topographic base map.
 
 ## Project structure
 
@@ -174,3 +186,37 @@ must be served together from the same public directory. The `predev` and
 `prebuild` npm lifecycle scripts run `web/scripts/copy-maplibre-worker.mjs`, which
 copies both files from the installed MapLibre package into `web/public/maplibre/`.
 Do not replace this with a `new URL(..., import.meta.url)` worker setup in Next.js.
+
+## Backups and data portability
+
+Catastro Digital 1.1 adds backup and restore directly to the sidebar under **Datos y copias**.
+
+- **Backup** downloads a versioned `catastro-digital-backup_YYYY-MM-DD_HHMM.json` file containing all groups and all parcels, including deleted parcels, styles, group assignments, timestamps and full WGS84 geometry.
+- **GeoJSON** downloads all parcel geometries and useful properties for GIS interoperability. GeoJSON is an export format, not the restore format.
+- **Importar** accepts Catastro Digital backup JSON files. The backend validates the complete document and every geometry before writing anything.
+- **Combinar** upserts the objects present in the backup while leaving other current data untouched.
+- **Reemplazar todo** deletes current application data and recreates it from the backup. The UI requires an explicit destructive-action confirmation.
+
+Imports are transactional: if any database write fails, PostgreSQL rolls back the complete import.
+
+For disaster recovery outside the application, a PostgreSQL `pg_dump` is still the strongest infrastructure-level backup. The in-app JSON backup is designed for convenient, portable backup/restore of Catastro Digital application data.
+
+
+## Add a parcel from the map
+
+1. Click **Añadir desde mapa** in the map toolbar.
+2. Catastro boundaries are enabled automatically.
+3. Click inside the parcel you want to keep.
+4. The API queries a small official Catastro WFS BBOX around that point and selects the polygon that actually contains the click.
+5. Review the amber preview outline.
+6. Click **Guardar parcela**. The normal parcel lookup/cache flow stores the official geometry in PostGIS.
+
+The original cadastral-reference search remains available and is useful when you already know the reference.
+
+## Basemap views
+
+- **Mapa** — OpenStreetMap, best for roads and place context.
+- **Ortofoto** — PNOA Máxima Actualidad from Spain's IGN/CNIG, best for seeing field boundaries, vegetation, buildings and access tracks.
+- **Topográfico** — official IGN raster cartography, useful for terrain context and traditional map reading.
+
+The Catastro boundary layer is independent of the basemap, so it can be overlaid on the PNOA orthoimage for the clearest parcel inspection.
