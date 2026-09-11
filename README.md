@@ -8,18 +8,19 @@
 
 <br>
 
-![Version](https://img.shields.io/badge/version-1.3.0-2f6f4e?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.4.0-2f6f4e?style=for-the-badge)
 ![Next.js](https://img.shields.io/badge/Next.js-16.3.1-black?style=for-the-badge&logo=nextdotjs)
 ![React](https://img.shields.io/badge/React-19.2.8-149eca?style=for-the-badge&logo=react&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.141.1-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![PostGIS](https://img.shields.io/badge/PostGIS-16--3.4-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ed?style=for-the-badge&logo=docker&logoColor=white)
 
-**Catastro Digital** permite localizar, visualizar, organizar y conservar parcelas catastrales en un mapa interactivo, combinando geometría oficial del Catastro, ortofotografía, cartografía y herramientas de uso sobre el terreno.
+**Catastro Digital** permite localizar, visualizar, organizar y conservar parcelas catastrales en un mapa interactivo, combinando geometría oficial del Catastro, ortofotografía, cartografía, cuentas de usuario, uso como invitado y herramientas de campo.
 
 [Características](#-qué-puede-hacer) ·
+[Modo invitado](#-modo-invitado) ·
+[Cuentas](#-cuentas-y-sincronización) ·
 [Instalación](#-instalación) ·
-[Uso](#-cómo-se-usa) ·
 [Modo campo](#-modo-campo) ·
 [Backups](#-backup-exportación-e-importación) ·
 [Tecnologías](#-stack-tecnológico)
@@ -34,7 +35,7 @@ Catastro Digital nace con una idea sencilla:
 
 > **Poder entender, organizar y consultar visualmente tus terrenos sin depender de una lista de referencias catastrales difícil de interpretar.**
 
-La aplicación consulta la geometría de las parcelas catastrales españolas, la almacena localmente en **PostgreSQL/PostGIS** y la representa sobre un mapa interactivo.
+La aplicación consulta y representa geometrías catastrales españolas sobre un mapa interactivo y permite añadir una capa personal de organización: nombres, colores, grupos, notas, estados y métricas.
 
 Cada parcela puede tener su propio:
 
@@ -47,9 +48,9 @@ Cada parcela puede tener su propio:
 - 📏 perímetro;
 - 🗑️ estado activo o eliminado.
 
-Además, Catastro Digital permite agrupar varias parcelas para comprenderlas como una única finca o conjunto territorial.
+Además, varias parcelas pueden agruparse para comprenderlas como una única finca o conjunto territorial.
 
-Por ejemplo:
+Ejemplo:
 
 ```text
 Finca familiar
@@ -72,31 +73,28 @@ Las parcelas guardadas se representan directamente sobre el mapa mediante su geo
 Puedes:
 
 - asignar un color diferente a cada parcela;
-- seleccionar una parcela desde la lista o desde el propio mapa;
+- seleccionar una parcela desde la lista o desde el mapa;
 - centrar automáticamente la cámara sobre ella;
 - ocultar grupos completos;
 - mostrar u ocultar parcelas eliminadas;
-- consultar sus datos sin abandonar el mapa.
+- consultar sus datos sin abandonar el mapa;
+- trabajar con mapa, ortofoto y cartografía topográfica.
 
 ---
 
-## 🖱️ Añadir parcelas haciendo clic
+## 🖱️ Identificar parcelas haciendo clic o tocando el mapa
 
 No necesitas conocer previamente la referencia catastral.
 
-Activa:
+En la experiencia actual, un clic o toque normal sobre el mapa intenta identificar la parcela bajo ese punto:
 
-**`Añadir desde mapa`**
-
-y haz clic dentro de una parcela.
-
-Catastro Digital:
-
-1. obtiene las coordenadas del clic;
-2. consulta el servicio oficial del Catastro;
-3. identifica el polígono que contiene ese punto;
+1. obtiene las coordenadas;
+2. consulta la información catastral disponible;
+3. identifica el polígono correspondiente;
 4. muestra una previsualización;
-5. permite confirmar antes de guardar.
+5. permite guardar la parcela explícitamente.
+
+Si pulsas una parcela que ya está guardada, se abre directamente sin lanzar una nueva identificación.
 
 También sigue disponible la búsqueda tradicional por **referencia catastral**.
 
@@ -122,9 +120,9 @@ Una combinación especialmente útil es:
 
 ## 📐 Superficie, hectáreas y perímetros
 
-Las medidas se calculan directamente desde las geometrías almacenadas en **PostGIS**.
+Las métricas de las parcelas autenticadas se calculan a partir de las geometrías almacenadas en **PostGIS**.
 
-Cada parcela muestra:
+Cada parcela puede mostrar:
 
 - superficie en `m²`;
 - superficie en `ha`;
@@ -142,8 +140,6 @@ Perímetro        412 m
 
 Los grupos también muestran estadísticas agregadas.
 
-Cuando varias parcelas contiguas forman un conjunto, el perímetro exterior se calcula sobre la unión de sus geometrías, evitando contar como perímetro los límites internos compartidos.
-
 ---
 
 ## 📁 Organización por grupos
@@ -159,12 +155,11 @@ Las parcelas pueden organizarse en grupos como:
 - Ponteareas
 - As Neves
 
-Cada grupo muestra:
+Cada grupo puede mostrar:
 
 - número de parcelas;
 - superficie total;
-- hectáreas totales;
-- perímetro conjunto.
+- hectáreas totales.
 
 Los grupos pueden:
 
@@ -183,9 +178,50 @@ Puedes localizar rápidamente parcelas por:
 
 - nombre;
 - referencia catastral;
+- notas;
 - grupo.
 
 La interfaz está pensada para seguir siendo manejable aunque la colección crezca.
+
+---
+
+# 👤 Modo invitado
+
+Catastro Digital puede utilizarse **sin crear una cuenta**.
+
+En modo invitado:
+
+- las parcelas y grupos se guardan localmente en el navegador mediante **IndexedDB**;
+- los datos sobreviven a cierres y reinicios normales del navegador;
+- no se crea ningún usuario anónimo en el backend;
+- el usuario puede exportar un backup y GeoJSON;
+- puede importar y restaurar sus datos localmente;
+- puede utilizar el Modo Campo con las parcelas guardadas en el dispositivo.
+
+Los datos de invitado pueden perderse si se borran los datos del navegador o se cambia de dispositivo.
+
+---
+
+# 🔐 Cuentas y sincronización
+
+Crear una cuenta es opcional.
+
+Una cuenta permite:
+
+- acceder a tus parcelas desde distintos dispositivos;
+- guardar datos en PostgreSQL/PostGIS;
+- mantener separación entre usuarios;
+- importar los datos creados previamente como invitado;
+- conservar grupos, nombres, notas y geometrías.
+
+Cuando un usuario inicia sesión y existen datos locales de invitado, Catastro Digital puede ofrecer una migración al servidor.
+
+Si existen grupos con el mismo nombre, la aplicación permite decidir si:
+
+- se reutiliza el grupo ya existente;
+- o se renombra el grupo local antes de migrarlo.
+
+La migración local → cuenta solo elimina los datos locales cuando el proceso termina correctamente.
 
 ---
 
@@ -205,7 +241,7 @@ Al activarlo, la aplicación puede utilizar la geolocalización del dispositivo 
 - 📐 superficie de la finca;
 - 🛰️ ortofotografía PNOA como referencia visual.
 
-### Ejemplo conceptual
+Ejemplo conceptual:
 
 ```text
 MODO CAMPO
@@ -220,7 +256,7 @@ Límite más cercano          12,4 m
 [ Centrarme ]     [ Ver finca ]
 ```
 
-Sobre el mapa se representa:
+Sobre el mapa puede representarse:
 
 ```text
         límite de la finca
@@ -233,6 +269,11 @@ Sobre el mapa se representa:
 ```
 
 Si no seleccionas previamente una parcela, Catastro Digital puede detectar automáticamente si tu posición se encuentra dentro de alguna de tus parcelas guardadas.
+
+### Invitado y cuenta
+
+- **Cuenta autenticada:** el cálculo se realiza contra el backend/PostGIS.
+- **Invitado:** el cálculo se realiza localmente contra las geometrías guardadas en IndexedDB.
 
 ### ⚠️ Precisión
 
@@ -253,7 +294,7 @@ La aplicación muestra deliberadamente la precisión indicada por el dispositivo
 
 Los datos introducidos en Catastro Digital tienen valor.
 
-Por eso la aplicación incorpora herramientas de portabilidad directamente desde la interfaz.
+Por eso la aplicación incorpora herramientas de portabilidad tanto para invitados como para usuarios autenticados.
 
 ## 📦 Backup
 
@@ -263,7 +304,7 @@ Genera un archivo:
 catastro-digital-backup_YYYY-MM-DD_HHMM.json
 ```
 
-El backup incluye:
+El backup puede incluir:
 
 - parcelas;
 - geometrías;
@@ -275,13 +316,29 @@ El backup incluye:
 - fechas;
 - metadatos necesarios para restaurar el estado de la aplicación.
 
-El formato actual es **Backup v2** y mantiene compatibilidad de importación con backups v1.
+El formato actual es **Backup v3**.
+
+### Comportamiento según el modo
+
+**Invitado**
+
+- exportación desde IndexedDB;
+- importación local;
+- modo `merge`;
+- modo `replace`.
+
+**Cuenta**
+
+- exportación desde el backend;
+- validación en servidor;
+- importación multiusuario;
+- cada operación afecta únicamente a los datos del usuario autenticado.
 
 ---
 
 ## 🌐 Exportar GeoJSON
 
-También puedes exportar todas las parcelas como:
+También puedes exportar las parcelas como:
 
 ```text
 catastro-digital_YYYY-MM-DD_HHMM.geojson
@@ -303,15 +360,13 @@ Al importar un backup hay dos modos:
 
 ### Combinar
 
-Actualiza y añade los elementos incluidos en el archivo sin eliminar los demás datos existentes.
+Añade y actualiza los elementos incluidos en el archivo sin eliminar los demás datos existentes.
 
 ### Reemplazar todo
 
-Restaura exactamente el contenido del backup.
+Restaura el contenido del backup como estado actual.
 
-Este modo requiere confirmación adicional porque sustituye los datos actuales.
-
-Las importaciones se ejecutan dentro de una **transacción PostgreSQL**. Si algún elemento no puede validarse o guardarse, la operación completa se revierte.
+Este modo requiere confirmación adicional porque sustituye los datos existentes del usuario actual.
 
 ---
 
@@ -353,11 +408,13 @@ flowchart LR
         D[("🗄️ PostgreSQL + PostGIS<br/>Port 5432")]
     end
 
+    L["💾 IndexedDB<br/>Modo invitado"]
     C["🏛️ Catastro<br/>WFS / WMS"]
     I["🗺️ IGN / CNIG<br/>PNOA + cartografía"]
     O["🌍 OpenStreetMap"]
 
     U --> W
+    W --> L
     W -->|/api/*| A
     A --> D
     A --> C
@@ -365,7 +422,7 @@ flowchart LR
     W --> O
 ```
 
-La aplicación utiliza tres contenedores:
+La aplicación utiliza tres contenedores principales:
 
 | Servicio | Función | Puerto por defecto |
 |---|---|---:|
@@ -373,11 +430,69 @@ La aplicación utiliza tres contenedores:
 | `cadweb_api` | API FastAPI | `8000` |
 | `cadweb_db` | PostgreSQL + PostGIS | `5432` |
 
-Los datos persistentes se almacenan en el volumen Docker:
+Los datos persistentes del backend se almacenan en el volumen Docker:
 
 ```text
 db_data
 ```
+
+---
+
+# 🗄️ Modelo de datos multiusuario
+
+La aplicación separa los datos oficiales reutilizables de los datos personales de cada usuario.
+
+## `cadastral_parcels`
+
+Contiene información catastral compartida:
+
+- referencia catastral;
+- geometría oficial;
+- fechas de cacheado y actualización.
+
+## `user_parcels`
+
+Contiene la capa personal de cada usuario:
+
+- `user_id`;
+- referencia catastral;
+- nombre;
+- notas;
+- color;
+- grupo;
+- estado eliminado;
+- fechas.
+
+## `parcel_groups`
+
+Cada grupo pertenece a un usuario concreto.
+
+Esto permite reutilizar una geometría oficial entre distintos usuarios sin compartir sus nombres, notas, grupos o estados personales.
+
+---
+
+# 🔁 Migraciones de base de datos
+
+Catastro Digital utiliza **Alembic** para versionar el esquema de la base de datos.
+
+Las migraciones se encuentran en:
+
+```text
+api/alembic/
+api/alembic/versions/
+```
+
+Los archivos de Alembic forman parte del código fuente y deben incluirse en Git.
+
+Migraciones actuales incluyen:
+
+- baseline inicial;
+- usuarios;
+- propiedad de grupos;
+- migración de datos existentes;
+- creación de `cadastral_parcels`;
+- creación de `user_parcels`;
+- eliminación de la tabla legacy `parcels`.
 
 ---
 
@@ -393,11 +508,9 @@ db_data
 | React DOM | `19.2.8` |
 | TypeScript | `5.9.3` |
 | MapLibre GL JS | `6.3.0` |
-| @types/react | `19.2.18` |
-| @types/react-dom | `19.2.4` |
-| @types/geojson | `7946.0.16` |
+| IndexedDB | API nativa del navegador |
 
-El frontend utiliza **Webpack** explícitamente con Next.js para mantener una integración estable con el worker ESM de MapLibre GL JS 6.
+El frontend utiliza **Webpack** explícitamente con Next.js para mantener una integración estable con el worker ESM de MapLibre GL JS.
 
 ---
 
@@ -413,6 +526,9 @@ El frontend utiliza **Webpack** explícitamente con Next.js para mantener una in
 | GeoAlchemy2 | `0.20.0` |
 | Shapely | `2.1.2` |
 | HTTPX | `0.28.1` |
+| Alembic | Migraciones |
+| argon2-cffi | Hash de contraseñas |
+| PyJWT | Autenticación JWT |
 | GDAL / ogr2ogr | Imagen Debian |
 
 ---
@@ -490,17 +606,23 @@ cd Catastro-Digital
 
 ---
 
-## 2. Configuración opcional
+## 2. Configuración
 
-La aplicación incluye valores por defecto.
+Copia el archivo de ejemplo:
 
-Si quieres personalizarlos:
+### PowerShell
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Contenido:
+### Linux / macOS
+
+```bash
+cp .env.example .env
+```
+
+Variables principales:
 
 ```env
 POSTGRES_DB=cadweb
@@ -510,9 +632,11 @@ POSTGRES_PASSWORD=cadweb
 WEB_PORT=3000
 API_PORT=8000
 DB_PORT=5432
+
+JWT_SECRET=cambia-esto-en-produccion
 ```
 
-> Para una instalación accesible desde Internet debes cambiar las credenciales por defecto de PostgreSQL.
+> Para una instalación accesible desde Internet debes utilizar credenciales y secretos propios.
 
 ---
 
@@ -570,7 +694,7 @@ http://localhost:8000/health
 
 1. Introduce una referencia catastral.
 2. Pulsa **Añadir**.
-3. Catastro Digital obtiene la geometría.
+3. Catastro Digital obtiene o previsualiza la geometría.
 4. La parcela aparece en el mapa.
 5. Asígnale nombre, color, grupo o notas.
 
@@ -578,17 +702,18 @@ http://localhost:8000/health
 
 ## Opción B — Seleccionar desde el mapa
 
-1. Activa **Añadir desde mapa**.
-2. Activa la ortofoto si quieres identificar mejor el terreno.
-3. Haz clic dentro de la parcela.
-4. Comprueba el contorno resaltado.
-5. Pulsa **Guardar parcela**.
+1. Haz clic o toca dentro del terreno.
+2. Catastro Digital identifica la parcela.
+3. Comprueba el contorno resaltado.
+4. Pulsa **Guardar parcela**.
+
+Si la parcela ya está guardada, se abre directamente.
 
 ---
 
 ## Organizar
 
-Después puedes:
+Después puedes gestionar:
 
 ```text
 Parcela
@@ -601,15 +726,82 @@ Parcela
 └── Perímetro
 ```
 
-Los cambios quedan almacenados en PostgreSQL/PostGIS.
+En modo invitado los cambios quedan en IndexedDB.
+
+Con cuenta, se guardan en PostgreSQL/PostGIS.
 
 ---
 
-# 📱 Usarlo desde el móvil
+# 📱 Experiencia móvil
 
-La interfaz es responsive y el **Modo Campo** está diseñado especialmente para teléfonos.
+La interfaz web es responsive y está siendo diseñada con una experiencia visual coherente con las futuras aplicaciones móviles.
 
-Sin embargo, la API de geolocalización del navegador requiere un **contexto seguro**.
+En móvil, la navegación se organiza en:
+
+```text
+Inicio
+Parcelas
+Grupos
+Herramientas
+Más
+```
+
+La pantalla principal prioriza:
+
+- mapa;
+- buscador;
+- selector de vista;
+- resumen de parcelas;
+- navegación inferior.
+
+El diseño móvil se está utilizando como base visual común para futuras aplicaciones **Android e iOS**.
+
+---
+
+# 📲 Android e iOS — dirección del proyecto
+
+La aplicación móvil prevista utilizará:
+
+- **React Native**;
+- **Expo**;
+- **TypeScript**.
+
+Objetivo:
+
+- misma identidad visual que la web;
+- mismos conceptos de navegación;
+- mismos tipos y contratos API;
+- misma lógica de cuenta/invitado;
+- almacenamiento local nativo;
+- GPS y permisos nativos;
+- soporte Android e iOS desde una única base de código móvil.
+
+Arquitectura prevista:
+
+```text
+Web
+Next.js + IndexedDB
+        │
+        ├──────────────┐
+        │              │
+        ▼              ▼
+     FastAPI       lógica compartida
+        ▲              ▲
+        │              │
+        └──────────────┤
+                       │
+Mobile                 │
+React Native + Expo + SQLite
+Android + iOS
+```
+
+La app móvil no pretende ser un producto visualmente distinto: debe sentirse como **Catastro Digital en otra plataforma**.
+
+---
+
+# 🌐 Geolocalización desde navegador
+
+La API de geolocalización del navegador requiere un **contexto seguro**.
 
 Por ello:
 
@@ -617,7 +809,7 @@ Por ello:
 http://localhost:3000
 ```
 
-funciona correctamente en el propio ordenador, pero abrir desde el móvil:
+funciona correctamente en el propio ordenador, pero abrir desde un teléfono:
 
 ```text
 http://192.168.x.x:3000
@@ -662,7 +854,7 @@ docker compose down -v
 
 La opción `-v` elimina los volúmenes asociados al proyecto y puede borrar la base de datos.
 
-Antes de cambios importantes, utiliza siempre:
+Antes de cambios importantes, utiliza:
 
 **Datos y copias → Backup**
 
@@ -683,7 +875,7 @@ docker compose down
 docker compose up -d --build
 ```
 
-Las migraciones de esquema incluidas están diseñadas para mantener los datos existentes.
+El esquema de la base de datos se versiona con Alembic.
 
 ---
 
@@ -749,11 +941,17 @@ Catastro-Digital/
 │
 ├── docker-compose.yml
 ├── .env.example
-├── CATASTRO.png
+├── CATASTRO_2.PNG
 │
 ├── api/
 │   ├── Dockerfile
 │   ├── requirements.txt
+│   ├── alembic.ini
+│   │
+│   ├── alembic/
+│   │   ├── env.py
+│   │   ├── script.py.mako
+│   │   └── versions/
 │   │
 │   └── app/
 │       ├── main.py
@@ -761,6 +959,8 @@ Catastro-Digital/
 │       ├── models.py
 │       │
 │       ├── routers/
+│       │   ├── auth.py
+│       │   ├── users.py
 │       │   ├── parcels.py
 │       │   ├── groups.py
 │       │   ├── backup.py
@@ -774,6 +974,7 @@ Catastro-Digital/
 └── web/
     ├── Dockerfile
     ├── package.json
+    ├── package-lock.json
     ├── next.config.ts
     ├── tsconfig.json
     │
@@ -784,7 +985,13 @@ Catastro-Digital/
         │   ├── sidebar/
         │   └── ui/
         ├── hooks/
+        │   ├── useAuth.ts
+        │   ├── useCadastreData.ts
+        │   └── useFieldLocation.ts
         ├── lib/
+        │   ├── api.ts
+        │   ├── guestDb.ts
+        │   └── map.ts
         └── types/
 ```
 
@@ -792,22 +999,39 @@ Catastro-Digital/
 
 # 🔐 Privacidad
 
-Catastro Digital es una aplicación **self-hosted**.
+Catastro Digital puede utilizarse de dos formas.
 
-Tus:
+## Invitado
 
-- nombres de parcelas;
-- grupos;
-- notas;
-- colores;
-- geometrías almacenadas;
-- organización personal;
+Los datos personales se almacenan únicamente en el navegador del usuario mediante IndexedDB.
 
-se guardan en tu propia base PostgreSQL/PostGIS.
+## Cuenta
 
-La aplicación no necesita un servicio cloud propio para almacenar ese inventario.
+Los datos personales se almacenan en la base PostgreSQL/PostGIS del despliegue de Catastro Digital.
 
-Las consultas necesarias para obtener cartografía y geometría sí utilizan los servicios externos correspondientes.
+En ambos casos, las consultas necesarias para obtener cartografía y geometría pueden utilizar los servicios externos correspondientes.
+
+---
+
+# 🔒 Seguridad
+
+La aplicación incorpora actualmente:
+
+- contraseñas con hash Argon2;
+- autenticación JWT;
+- aislamiento de parcelas y grupos por usuario;
+- endpoints protegidos;
+- validación de propiedad de grupos;
+- backups limitados al usuario autenticado.
+
+Para producción siguen siendo recomendables mejoras adicionales como:
+
+- refresh tokens;
+- revocación de sesión;
+- recuperación de contraseña;
+- verificación de email;
+- rate limiting de autenticación;
+- gestión avanzada de secretos.
 
 ---
 
@@ -854,9 +1078,9 @@ También puedes utilizar **Issues** para:
 
 ---
 
-# 🛣️ Posibles líneas de evolución
+# 🛣️ Roadmap
 
-Algunas mejoras naturales para el proyecto:
+Algunas líneas de evolución naturales:
 
 - 📷 fotos asociadas a parcelas;
 - 📎 documentos y escrituras;
@@ -865,10 +1089,12 @@ Algunas mejoras naturales para el proyecto:
 - 📐 medición manual de superficies;
 - 🛰️ comparación de ortofotos históricas;
 - 📊 panel estadístico del patrimonio territorial;
-- 📱 experiencia PWA;
-- 🔐 autenticación para despliegues remotos;
-- 🗺️ compartir una finca mediante una ficha o enlace;
-- 📍 navegación y orientación avanzada en Modo Campo.
+- 📍 navegación y orientación avanzada en Modo Campo;
+- 📱 app nativa Android;
+- 🍎 app nativa iOS;
+- 💾 almacenamiento local móvil mediante SQLite;
+- 🔄 sincronización local ↔ cuenta;
+- 🗺️ compartir una finca mediante una ficha o enlace.
 
 ---
 
@@ -902,7 +1128,7 @@ Catastro Digital intenta resolver un problema cotidiano con herramientas geoespa
 
 Tus terrenos no deberían ser solamente una lista de códigos.
 
-Deberían poder verse, entenderse, organizarse, recorrerlos y conservar su información.
+Deberían poder verse, entenderse, organizarse, recorrerse y conservar su información.
 
 ---
 
@@ -910,7 +1136,7 @@ Deberían poder verse, entenderse, organizarse, recorrerlos y conservar su infor
 
 ### 🗺️ Catastro Digital
 
-**Open mapping · Self-hosted · PostGIS powered · Built for understanding land**
+**Open mapping · Guest-first · Multi-user · Self-hosted · PostGIS powered**
 
 Repositorio:
 
