@@ -228,6 +228,20 @@ export const cadastreApi = {
         { method: "DELETE" },
       );
     },
+    async preview(
+        cadastralRef: string,
+    ): Promise<ParcelFeature> {
+      const data = await request<{
+        parcel: ParcelFeature;
+      }>("/parcels/preview", {
+        method: "POST",
+        body: JSON.stringify({
+          cadastral_ref: cadastralRef,
+        }),
+      });
+
+      return data.parcel;
+    },
   },
 };
 

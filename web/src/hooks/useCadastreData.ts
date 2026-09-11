@@ -178,16 +178,21 @@ export function useCadastreData(
       async (
           cadastralRef: string,
       ) => {
-        if (!authenticated) {
-          throw new Error(
-              "La búsqueda catastral para invitados estará disponible en el siguiente paso.",
-          );
-        }
+        let parcel: ParcelFeature;
 
-        const parcel =
-            await cadastreApi.parcels.lookup(
-                cadastralRef,
-            );
+        if (authenticated) {
+          parcel =
+              await cadastreApi.parcels.lookup(
+                  cadastralRef,
+              );
+        } else {
+          parcel =
+              await cadastreApi.parcels.preview(
+                  cadastralRef,
+              );
+
+          await guestDb.saveParcel(parcel);
+        }
 
         await Promise.all([
           refreshParcels(),
@@ -196,7 +201,9 @@ export function useCadastreData(
 
         setNotice({
           type: "success",
-          message: "Parcela cargada correctamente",
+          message: authenticated
+              ? "Parcela cargada correctamente"
+              : "Parcela guardada en este navegador",
         });
 
         return parcel;

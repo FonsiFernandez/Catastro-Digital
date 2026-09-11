@@ -129,6 +129,222 @@ def _parcel_metrics_sql() -> str:
         ST_Perimeter(geom_official::geography)::double precision AS perimeter_m
     """
 
+@router.post("/preview")
+async def preview_parcel(
+        payload: ParcelLookupRequest,
+) -> dict[str, Any]:
+    """
+    Public read-only cadastral lookup.
+
+    Returns a parcel preview without creating or modifying
+    cadastral_parcels or user_parcels.
+    """
+
+    rc = _normalise_rc(payload.cadastral_ref)
+    rc14 = rc[:14]
+
+    # ---------------------------------------------------------
+    # 1. Reuse shared cadastral cache when available.
+    #    This is public cadastral geometry, not user data.
+    # ---------------------------------------------------------
+
+    with engine.begin() as conn:
+        cached_row = conn.execute(
+            text(
+                """
+                SELECT
+                    cadastral_ref,
+                    ST_AsGeoJSON(geom_official) AS geom,
+                    ST_Area(
+                            geom_official::geography
+                    )::double precision AS area_m2,
+                    (
+                        ST_Area(
+                            geom_official::geography
+                        ) / 10000.0
+                    )::double precision AS area_ha,
+                    ST_Perimeter(
+                        geom_official::geography
+                    )::double precision AS perimeter_m
+                FROM cadastral_parcels
+                WHERE cadastral_ref = :rc
+                   OR LEFT(cadastral_ref, 14) = :rc14
+                ORDER BY
+                    (cadastral_ref = :rc) DESC,
+                    updated_at DESC
+                    LIMIT 1
+                """
+            ),
+            {
+                "rc": rc,
+                "rc14": rc14,
+            },
+        ).mappings().first()
+
+    if cached_row:
+        return {
+            "parcel": {
+                "type": "Feature",
+                "geometry": json.loads(cached_row["geom"]),
+                "properties": {
+                    "cadastral_ref": cached_row["cadastral_ref"],
+                    "name": None,
+                    "notes": None,
+                    "color": DEFAULT_COLOR,
+                    "group_id": None,
+                    "is_deleted": False,
+                    "area_m2": _metric(
+                        cached_row["area_m2"]
+                    ),
+                    "area_ha": _metric(
+                        cached_row["area_ha"]
+                    ),
+                    "perimeter_m": _metric(
+                        cached_row["perimeter_m"]
+                    ),
+                    "source": "cadastral_cache",
+                },
+            }
+        }
+
+    # ---------------------------------------------------------
+    # 2. Nothing cached: call Catastro.
+    # ---------------------------------------------------------
+
+    if is_denied():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Catastro está bloqueado temporalmente por rate-limit. "
+                f"Reintenta en ~{remaining_seconds()}s. "
+                f"Motivo: {deny_reason()}"
+            ),
+        )
+
+    try:
+        xml_text, srs_used = await fetch_parcel_gml(
+            rc14
+        )
+
+    except Exception as exc:
+        message = str(exc)
+
+        if _catastro_error_is_rate_limit(message):
+            deny_for(
+                60 * 60,
+                "Límite de peticiones por hora (Catastro)",
+                )
+
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Catastro ha denegado la petición por límite horario. "
+                    "Las llamadas externas quedan pausadas durante "
+                    "60 minutos."
+                ),
+            ) from exc
+
+        raise HTTPException(
+            status_code=502,
+            detail=f"Error llamando WFS Catastro: {exc}",
+        ) from exc
+
+    # ---------------------------------------------------------
+    # 3. Convert GML to GeoJSON.
+    # ---------------------------------------------------------
+
+    try:
+        feature = gml_text_to_geojson_feature(
+            xml_text
+        )
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Error convirtiendo GML a GeoJSON: {exc}",
+        ) from exc
+
+    geometry = feature.get("geometry")
+
+    if not geometry:
+        raise HTTPException(
+            status_code=502,
+            detail="Catastro devolvió una parcela sin geometría",
+        )
+
+    # Prefer the cadastral reference returned by Catastro if present.
+    returned_rc = _extract_cadastral_ref(
+        feature.get("properties") or {}
+    )
+
+    actual_rc = returned_rc or rc
+
+    # ---------------------------------------------------------
+    # 4. Calculate metrics without storing anything.
+    # ---------------------------------------------------------
+
+    geometry_json = json.dumps(geometry)
+
+    with engine.begin() as conn:
+        metrics = conn.execute(
+            text(
+                """
+                WITH candidate AS (
+                    SELECT ST_Multi(
+                                   ST_SetSRID(
+                                           ST_GeomFromGeoJSON(:geometry),
+                                           4326
+                                   )
+                           ) AS geom
+                )
+                SELECT
+                    ST_Area(
+                            geom::geography
+                    )::double precision AS area_m2,
+
+                    (
+                        ST_Area(
+                            geom::geography
+                        ) / 10000.0
+                    )::double precision AS area_ha,
+
+                    ST_Perimeter(
+                        geom::geography
+                    )::double precision AS perimeter_m
+
+                FROM candidate
+                """
+            ),
+            {
+                "geometry": geometry_json,
+            },
+        ).mappings().one()
+
+    return {
+        "parcel": {
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": {
+                "cadastral_ref": actual_rc,
+                "name": None,
+                "notes": None,
+                "color": DEFAULT_COLOR,
+                "group_id": None,
+                "is_deleted": False,
+                "area_m2": _metric(
+                    metrics["area_m2"]
+                ),
+                "area_ha": _metric(
+                    metrics["area_ha"]
+                ),
+                "perimeter_m": _metric(
+                    metrics["perimeter_m"]
+                ),
+                "source": "catastro_wfs_gml",
+                "srs_in": srs_used,
+            },
+        }
+    }
 
 @router.post("/identify")
 async def identify_parcel(
