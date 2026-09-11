@@ -89,10 +89,10 @@ def _extract_cadastral_ref(properties: dict[str, Any]) -> str | None:
 def _catastro_error_is_rate_limit(message: str) -> bool:
     lowered = message.lower()
     return (
-        "limite de peticiones" in lowered
-        or "límite de peticiones" in lowered
-        or "peticion denegada" in lowered
-        or "petición denegada" in lowered
+            "limite de peticiones" in lowered
+            or "límite de peticiones" in lowered
+            or "peticion denegada" in lowered
+            or "petición denegada" in lowered
     )
 
 
@@ -227,7 +227,7 @@ async def preview_parcel(
         )
 
     except Exception as exc:
-        message = str(exc)
+        message = str(exc) or repr(exc)
 
         if _catastro_error_is_rate_limit(message):
             deny_for(
@@ -246,7 +246,7 @@ async def preview_parcel(
 
         raise HTTPException(
             status_code=502,
-            detail=f"Error llamando WFS Catastro: {exc}",
+            detail=f"Error llamando WFS Catastro: {type(exc).__name__}: {message}",
         ) from exc
 
     # ---------------------------------------------------------
@@ -466,7 +466,7 @@ async def identify_parcel(
         features = gml_text_to_geojson_features(xml_text)
 
     except Exception as exc:
-        message = str(exc)
+        message = str(exc) or repr(exc)
 
         if _catastro_error_is_rate_limit(message):
             deny_for(
@@ -486,7 +486,7 @@ async def identify_parcel(
 
         raise HTTPException(
             status_code=502,
-            detail=f"Error identificando parcela en Catastro: {exc}",
+            detail=f"Error identificando parcela en Catastro: {type(exc).__name__}: {message}",
         ) from exc
 
     click_point = Point(
@@ -988,7 +988,7 @@ async def lookup_parcel(
         xml_text, _srs_used = await fetch_parcel_gml(rc14)
 
     except Exception as exc:
-        message = str(exc)
+        message = str(exc) or repr(exc)
 
         if _catastro_error_is_rate_limit(message):
             deny_for(
@@ -1007,7 +1007,7 @@ async def lookup_parcel(
 
         raise HTTPException(
             status_code=502,
-            detail=f"Error llamando WFS Catastro: {exc}",
+            detail=f"Error llamando WFS Catastro: {type(exc).__name__}: {message}",
         ) from exc
 
     # ---------------------------------------------------------

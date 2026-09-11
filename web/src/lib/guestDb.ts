@@ -1,7 +1,10 @@
 import type {
+    BackupDocument,
     ParcelFeature,
     ParcelGroup,
 } from "@/types/cadastre";
+
+import { DEFAULT_PARCEL_COLOR } from "@/lib/map";
 
 const DB_NAME = "catastro-digital";
 const DB_VERSION = 1;
@@ -495,6 +498,93 @@ export const guestDb = {
             }
 
             await transactionDone(transaction);
+        } finally {
+            db.close();
+        }
+    },
+
+    async exportBackup(): Promise<BackupDocument> {
+        const db = await openDatabase();
+
+        try {
+            const transaction = db.transaction(
+                [
+                    GROUP_STORE,
+                    PARCEL_STORE,
+                ],
+                "readonly",
+            );
+
+            const groupRows =
+                await requestResult<StoredGroup[]>(
+                    transaction
+                        .objectStore(GROUP_STORE)
+                        .getAll(),
+                );
+
+            const parcelRows =
+                await requestResult<StoredParcel[]>(
+                    transaction
+                        .objectStore(PARCEL_STORE)
+                        .getAll(),
+                );
+
+            return {
+                format: "catastro-digital-backup",
+                version: 3,
+                exported_at: new Date().toISOString(),
+
+                groups: groupRows.map((group) => ({
+                    id: group.id,
+                    name: group.name,
+                    is_hidden: group.is_hidden,
+                    created_at: group.created_at,
+                    updated_at: group.updated_at,
+                })),
+
+                parcels: parcelRows.map((row) => {
+                    const parcel = row.feature;
+                    const properties = parcel.properties;
+
+                    return {
+                        cadastral_ref:
+                        properties.cadastral_ref,
+
+                        name:
+                            properties.name ?? null,
+
+                        notes:
+                            properties.notes ?? null,
+
+                        color:
+                            properties.color ??
+                            DEFAULT_PARCEL_COLOR,
+
+                        group_id:
+                            properties.group_id ?? null,
+
+                        is_deleted:
+                        properties.is_deleted,
+
+                        geometry:
+                        parcel.geometry,
+
+                        created_at:
+                        row.created_at,
+
+                        updated_at:
+                        row.updated_at,
+
+                        last_fetched_at:
+                            null,
+
+                        deleted_at:
+                            properties.is_deleted
+                                ? row.updated_at
+                                : null,
+                    };
+                }),
+            };
         } finally {
             db.close();
         }

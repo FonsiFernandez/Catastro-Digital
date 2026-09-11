@@ -17,6 +17,10 @@ import type {
   NoticeState,
   BaseMapId,
 } from "@/types/cadastre";
+import type {
+  GuestMigrationPreview,
+  GuestMigrationResolutions,
+} from "@/hooks/useAuth";
 
 export function Sidebar({
   rcInput,
@@ -46,6 +50,9 @@ export function Sidebar({
   onNotice,
   user,
   isGuest,
+  hasGuestData,
+  getGuestMigrationPreview,
+  migrateGuestData,
   onLogin,
   onRegister,
   onLogout,
@@ -77,6 +84,9 @@ export function Sidebar({
   onNotice: (notice: NoticeState) => void;
   user: AuthUser | null;
   isGuest: boolean;
+  hasGuestData: boolean;
+  getGuestMigrationPreview: () => Promise<GuestMigrationPreview>;
+  migrateGuestData: (resolutions?: GuestMigrationResolutions,) => Promise<{ migrated: boolean; groups: number; parcels: number; }>;
   onLogin: (email: string, password: string,) => Promise<unknown>;
   onRegister: (email: string, password: string, displayName?: string,) => Promise<unknown>;
   onLogout: () => void;
@@ -100,9 +110,13 @@ export function Sidebar({
         <AuthPanel
             user={user}
             isGuest={isGuest}
+            hasGuestData={hasGuestData}
             login={onLogin}
             register={onRegister}
             logout={onLogout}
+            getGuestMigrationPreview={getGuestMigrationPreview}
+            migrateGuestData={migrateGuestData}
+            onRefresh={onRefresh}
         />
 
         <div className="header-actions">

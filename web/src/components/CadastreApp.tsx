@@ -321,6 +321,9 @@ export default function CadastreApp() {
         onNotice={data.setNotice}
         user={auth.user}
         isGuest={auth.isGuest}
+        hasGuestData={auth.hasGuestData}
+        getGuestMigrationPreview={auth.getGuestMigrationPreview}
+        migrateGuestData={auth.migrateGuestData}
         onLogin={auth.login}
         onRegister={auth.register}
         onLogout={auth.logout}
