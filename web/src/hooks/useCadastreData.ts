@@ -11,7 +11,10 @@ import type {
   ParcelUpdate,
 } from "@/types/cadastre";
 
-export function useCadastreData(includeDeleted: boolean) {
+export function useCadastreData(
+    includeDeleted: boolean,
+    enabled = true,
+) {
   const [groups, setGroups] = useState<ParcelGroup[]>([]);
   const [parcels, setParcels] = useState<ParcelFeature[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,22 +35,47 @@ export function useCadastreData(includeDeleted: boolean) {
   }, [includeDeleted]);
 
   const refreshAll = useCallback(async () => {
+    if (!enabled) {
+      setGroups([]);
+      setParcels([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+
     try {
-      await Promise.all([refreshGroups(), refreshParcels()]);
+      await Promise.all([
+        refreshGroups(),
+        refreshParcels(),
+      ]);
     } catch (error) {
       setNotice({
         type: "error",
-        message: readableApiError(error, "No se pudieron cargar los datos"),
+        message: readableApiError(
+            error,
+            "No se pudieron cargar los datos",
+        ),
       });
     } finally {
       setLoading(false);
     }
-  }, [refreshGroups, refreshParcels]);
+  }, [
+    enabled,
+    refreshGroups,
+    refreshParcels,
+  ]);
 
   useEffect(() => {
+    if (!enabled) {
+      setGroups([]);
+      setParcels([]);
+      setLoading(false);
+      return;
+    }
+
     void refreshAll();
-  }, [refreshAll]);
+  }, [enabled, refreshAll]);
 
   const identifyParcel = useCallback(async (longitude: number, latitude: number) => {
     return cadastreApi.parcels.identify(longitude, latitude);

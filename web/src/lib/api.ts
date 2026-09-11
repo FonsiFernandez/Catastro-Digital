@@ -24,15 +24,48 @@ export class ApiError extends Error {
   }
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  display_name: string | null;
+  is_active: boolean;
+  email_verified: boolean;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+}
+
+const AUTH_TOKEN_KEY = "catastro.authToken";
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const token = getAuthToken();
 
   try {
     const response = await fetch(`${API_BASE}${path}`, {
       ...init,
       headers: {
         ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },
       signal: controller.signal,
@@ -73,6 +106,41 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const cadastreApi = {
+
+  auth: {
+    login(email: string, password: string): Promise<AuthResponse> {
+      return request<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+    },
+
+    register(
+        email: string,
+        password: string,
+        displayName?: string,
+    ): Promise<AuthResponse> {
+      return request<AuthResponse>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          email,
+          password,
+          display_name: displayName?.trim() || null,
+        }),
+      });
+    },
+
+    me(): Promise<AuthUser> {
+      return request<AuthUser>("/users/me");
+    },
+
+    logout(): void {
+      clearAuthToken();
+    },
+  },
 
   backup: {
     export(): Promise<BackupDocument> {

@@ -10,6 +10,7 @@ import { CrosshairIcon } from "@/components/ui/Icons";
 import { Notice } from "@/components/ui/Notice";
 import { useCadastreData } from "@/hooks/useCadastreData";
 import { useFieldLocation } from "@/hooks/useFieldLocation";
+import { useAuth } from "@/hooks/useAuth";
 import { readableApiError } from "@/lib/api";
 import { formatHectares } from "@/lib/format";
 import type { BaseMapId, FieldTarget, ParcelFeature } from "@/types/cadastre";
@@ -74,7 +75,8 @@ export default function CadastreApp() {
   const [fieldTarget, setFieldTarget] = useState<FieldTarget | null>(null);
   const [fieldDataError, setFieldDataError] = useState<string | null>(null);
 
-  const data = useCadastreData(includeDeleted);
+  const auth = useAuth();
+  const data = useCadastreData( includeDeleted, auth.isAuthenticated,);
   const field = useFieldLocation();
 
   const visibleParcels = useMemo(() => {
@@ -317,6 +319,11 @@ export default function CadastreApp() {
         }}
         onRefresh={data.refreshAll}
         onNotice={data.setNotice}
+        user={auth.user}
+        isGuest={auth.isGuest}
+        onLogin={auth.login}
+        onRegister={auth.register}
+        onLogout={auth.logout}
       />
 
       <section className={identifyMode ? "cad-map-shell is-identifying" : "cad-map-shell"}>

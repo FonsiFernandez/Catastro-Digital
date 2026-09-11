@@ -7,6 +7,8 @@ import { LandSummary } from "@/components/sidebar/LandSummary";
 import { ParcelInspector } from "@/components/sidebar/ParcelInspector";
 import { ParcelList } from "@/components/sidebar/ParcelList";
 import { SearchBar } from "@/components/sidebar/SearchBar";
+import { AuthPanel } from "@/components/sidebar/AuthPanel";
+import type { AuthUser } from "@/lib/api";
 import type {
   GroupUpdate,
   ParcelFeature,
@@ -42,6 +44,11 @@ export function Sidebar({
   onCenterSelected,
   onRefresh,
   onNotice,
+  user,
+  isGuest,
+  onLogin,
+  onRegister,
+  onLogout,
 }: {
   rcInput: string;
   onRcInput: (value: string) => void;
@@ -68,6 +75,11 @@ export function Sidebar({
   onCenterSelected: () => void;
   onRefresh: () => Promise<unknown>;
   onNotice: (notice: NoticeState) => void;
+  user: AuthUser | null;
+  isGuest: boolean;
+  onLogin: (email: string, password: string,) => Promise<unknown>;
+  onRegister: (email: string, password: string, displayName?: string,) => Promise<unknown>;
+  onLogout: () => void;
 }) {
   const activeCount = parcels.filter((parcel) => !parcel.properties.is_deleted).length;
 
@@ -75,18 +87,38 @@ export function Sidebar({
     <aside className="cad-sidebar">
       <header className="sidebar-header">
         <div className="brand">
-          <div className="brand-mark"><MapPinIcon /></div>
+          <div className="brand-mark">
+            <MapPinIcon />
+          </div>
+
           <div>
             <h1>Catastro Digital</h1>
             <p>Organiza y visualiza tus parcelas</p>
           </div>
         </div>
+
+        <AuthPanel
+            user={user}
+            isGuest={isGuest}
+            login={onLogin}
+            register={onRegister}
+            logout={onLogout}
+        />
+
         <div className="header-actions">
           <div className="summary-pill">
             <strong>{activeCount}</strong>
-            <span>{activeCount === 1 ? "parcela" : "parcelas"}</span>
+            <span>
+        {activeCount === 1 ? "parcela" : "parcelas"}
+      </span>
           </div>
-          <button type="button" className="icon-button refresh-button" title="Actualizar datos" onClick={() => void onRefresh()}>
+
+          <button
+              type="button"
+              className="icon-button refresh-button"
+              title="Actualizar datos"
+              onClick={() => void onRefresh()}
+          >
             <RefreshIcon />
           </button>
         </div>
