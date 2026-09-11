@@ -7,17 +7,20 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db import engine
 
+from app.auth.dependencies import get_current_user
+from app.models import User
+
 router = APIRouter(prefix="/backup", tags=["backup"])
 
 BACKUP_FORMAT = "catastro-digital-backup"
-BACKUP_VERSION = 2
+BACKUP_VERSION = 3
 RC_RE = re.compile(r"^[0-9A-Z]{14,20}$")
 COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
@@ -115,7 +118,7 @@ class BackupParcel(BaseModel):
 
 class BackupDocument(BaseModel):
     format: Literal["catastro-digital-backup"] = BACKUP_FORMAT
-    version: Literal[1, 2] = BACKUP_VERSION
+    version: Literal[1, 2, 3] = BACKUP_VERSION
     exported_at: datetime
     groups: list[BackupGroup]
     parcels: list[BackupParcel]
@@ -216,43 +219,75 @@ def _validate_geometries(document: BackupDocument) -> None:
 
 
 @router.get("")
-def export_backup() -> dict[str, Any]:
+def export_backup(
+        current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = str(current_user.id)
+
     with engine.begin() as conn:
         group_rows = conn.execute(
             text(
                 """
-                SELECT id::text AS id, name, is_hidden, created_at, updated_at
+                SELECT
+                    id::text AS id,
+                    name,
+                    is_hidden,
+                    created_at,
+                    updated_at
                 FROM parcel_groups
+                WHERE user_id = CAST(:user_id AS uuid)
                 ORDER BY created_at ASC, name ASC
                 """
-            )
+            ),
+            {
+                "user_id": user_id,
+            },
         ).mappings().all()
 
         parcel_rows = conn.execute(
             text(
                 """
                 SELECT
-                    cadastral_ref,
-                    name,
-                    notes,
-                    color,
-                    group_id::text AS group_id,
-                    is_deleted,
-                    ST_AsGeoJSON(geom_official) AS geometry,
-                    created_at,
-                    updated_at,
-                    last_fetched_at,
-                    deleted_at
-                FROM parcels
-                ORDER BY created_at ASC, cadastral_ref ASC
+                    up.cadastral_ref,
+                    up.name,
+                    up.notes,
+                    up.color,
+                    up.group_id::text AS group_id,
+                    up.is_deleted,
+
+                    ST_AsGeoJSON(
+                            cp.geom_official
+                    ) AS geometry,
+
+                    up.created_at,
+                    up.updated_at,
+
+                    cp.last_fetched_at,
+
+                    up.deleted_at
+
+                FROM user_parcels up
+
+                         INNER JOIN cadastral_parcels cp
+                                    ON cp.cadastral_ref = up.cadastral_ref
+
+                WHERE up.user_id = CAST(:user_id AS uuid)
+
+                ORDER BY
+                    up.created_at ASC,
+                    up.cadastral_ref ASC
                 """
-            )
+            ),
+            {
+                "user_id": user_id,
+            },
         ).mappings().all()
 
     return {
         "format": BACKUP_FORMAT,
         "version": BACKUP_VERSION,
         "exported_at": datetime.now(timezone.utc).isoformat(),
+
         "groups": [
             {
                 "id": row["id"],
@@ -263,6 +298,7 @@ def export_backup() -> dict[str, Any]:
             }
             for row in group_rows
         ],
+
         "parcels": [
             {
                 "cadastral_ref": row["cadastral_ref"],
@@ -283,28 +319,61 @@ def export_backup() -> dict[str, Any]:
 
 
 @router.get("/geojson")
-def export_geojson() -> dict[str, Any]:
+def export_geojson(
+        current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    user_id = str(current_user.id)
+
     with engine.begin() as conn:
         rows = conn.execute(
             text(
                 """
                 SELECT
-                    p.cadastral_ref,
-                    p.name,
-                    p.notes,
-                    p.color,
-                    p.group_id::text AS group_id,
+                    up.cadastral_ref,
+                    up.name,
+                    up.notes,
+                    up.color,
+                    up.group_id::text AS group_id,
                     g.name AS group_name,
-                    p.is_deleted,
-                    ST_Area(p.geom_official::geography)::double precision AS area_m2,
-                    (ST_Area(p.geom_official::geography) / 10000.0)::double precision AS area_ha,
-                    ST_Perimeter(p.geom_official::geography)::double precision AS perimeter_m,
-                    ST_AsGeoJSON(p.geom_official) AS geometry
-                FROM parcels p
-                LEFT JOIN parcel_groups g ON g.id = p.group_id
-                ORDER BY p.created_at ASC, p.cadastral_ref ASC
+                    up.is_deleted,
+
+                    ST_Area(
+                            cp.geom_official::geography
+                    )::double precision AS area_m2,
+
+                    (
+                        ST_Area(
+                            cp.geom_official::geography
+                        ) / 10000.0
+                    )::double precision AS area_ha,
+
+                    ST_Perimeter(
+                        cp.geom_official::geography
+                    )::double precision AS perimeter_m,
+
+                    ST_AsGeoJSON(
+                        cp.geom_official
+                    ) AS geometry
+
+                FROM user_parcels up
+
+                    INNER JOIN cadastral_parcels cp
+                ON cp.cadastral_ref = up.cadastral_ref
+
+                    LEFT JOIN parcel_groups g
+                    ON g.id = up.group_id
+                    AND g.user_id = up.user_id
+
+                WHERE up.user_id = CAST(:user_id AS uuid)
+
+                ORDER BY
+                    up.created_at ASC,
+                    up.cadastral_ref ASC
                 """
-            )
+            ),
+            {
+                "user_id": user_id,
+            },
         ).mappings().all()
 
     return {
@@ -331,11 +400,15 @@ def export_geojson() -> dict[str, Any]:
     }
 
 
-@router.post("/import", response_model=ImportResult)
+@router.post(
+    "/import",
+    response_model=ImportResult,
+)
 def import_backup(
-    document: BackupDocument,
-    mode: Literal["merge", "replace"] = Query("merge"),
-    dry_run: bool = Query(False),
+        document: BackupDocument,
+        mode: Literal["merge", "replace"] = Query("merge"),
+        dry_run: bool = Query(False),
+        current_user: User = Depends(get_current_user),
 ) -> ImportResult:
     _validate_geometries(document)
 
@@ -349,35 +422,110 @@ def import_backup(
         )
 
     now = datetime.now(timezone.utc)
+    user_id = str(current_user.id)
 
     try:
         with engine.begin() as conn:
-            if mode == "replace":
-                conn.execute(text("DELETE FROM parcels"))
-                conn.execute(text("DELETE FROM parcel_groups"))
 
-            for group in document.groups:
+            # -------------------------------------------------
+            # REPLACE affects only the current user's data.
+            # -------------------------------------------------
+
+            if mode == "replace":
+
                 conn.execute(
                     text(
                         """
-                        INSERT INTO parcel_groups (id, name, is_hidden, created_at, updated_at)
-                        VALUES (
-                            CAST(:id AS uuid),
-                            :name,
-                            :is_hidden,
-                            COALESCE(:created_at, :now),
-                            COALESCE(:updated_at, :now)
-                        )
-                        ON CONFLICT (id) DO UPDATE
-                        SET
-                            name = EXCLUDED.name,
-                            is_hidden = EXCLUDED.is_hidden,
-                            created_at = EXCLUDED.created_at,
-                            updated_at = EXCLUDED.updated_at
+                        DELETE FROM user_parcels
+                        WHERE user_id = CAST(:user_id AS uuid)
+                        """
+                    ),
+                    {
+                        "user_id": user_id,
+                    },
+                )
+
+                conn.execute(
+                    text(
+                        """
+                        DELETE FROM parcel_groups
+                        WHERE user_id = CAST(:user_id AS uuid)
+                        """
+                    ),
+                    {
+                        "user_id": user_id,
+                    },
+                )
+
+            # -------------------------------------------------
+            # Map backup group IDs to destination group IDs.
+            # -------------------------------------------------
+
+            group_id_map: dict[str, str] = {}
+
+            for group in document.groups:
+
+                existing = conn.execute(
+                    text(
+                        """
+                        SELECT user_id::text AS user_id
+                        FROM parcel_groups
+                        WHERE id = CAST(:id AS uuid)
                         """
                     ),
                     {
                         "id": group.id,
+                    },
+                ).mappings().first()
+
+                if existing is None:
+                    destination_id = group.id
+
+                elif existing["user_id"] == user_id:
+                    destination_id = group.id
+
+                else:
+                    # Same backup/group UUID already belongs
+                    # to another account.
+                    destination_id = str(uuid.uuid4())
+
+                group_id_map[group.id] = destination_id
+
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO parcel_groups (
+                            id,
+                            user_id,
+                            name,
+                            is_hidden,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (
+                                   CAST(:id AS uuid),
+                                   CAST(:user_id AS uuid),
+                                   :name,
+                                   :is_hidden,
+                                   COALESCE(:created_at, :now),
+                                   COALESCE(:updated_at, :now)
+                               )
+
+                            ON CONFLICT (id)
+                        DO UPDATE
+                                                           SET
+                                                               name = EXCLUDED.name,
+                                                           is_hidden = EXCLUDED.is_hidden,
+                                                           created_at = EXCLUDED.created_at,
+                                                           updated_at = EXCLUDED.updated_at
+
+                           WHERE parcel_groups.user_id =
+                                                           EXCLUDED.user_id
+                        """
+                    ),
+                    {
+                        "id": destination_id,
+                        "user_id": user_id,
                         "name": group.name,
                         "is_hidden": group.is_hidden,
                         "created_at": group.created_at,
@@ -386,69 +534,156 @@ def import_backup(
                     },
                 )
 
+            # -------------------------------------------------
+            # Parcels
+            # -------------------------------------------------
+
             for parcel in document.parcels:
+
+                geometry_json = json.dumps(
+                    parcel.geometry,
+                    separators=(",", ":"),
+                )
+
+                # ---------------------------------------------
+                # Shared cadastral geometry
+                # ---------------------------------------------
+
                 conn.execute(
                     text(
                         """
-                        INSERT INTO parcels (
+                        INSERT INTO cadastral_parcels (
+                            cadastral_ref,
+                            geom_official,
+                            last_fetched_at,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (
+                                   :cadastral_ref,
+
+                                   ST_Multi(
+                                           ST_SetSRID(
+                                                   ST_GeomFromGeoJSON(:geometry),
+                                                   4326
+                                           )
+                                   ),
+
+                                   :last_fetched_at,
+
+                                   COALESCE(:created_at, :now),
+                                   COALESCE(:updated_at, :now)
+                               )
+
+                            ON CONFLICT (cadastral_ref)
+                        DO UPDATE
+                                                           SET
+                                                               geom_official =
+                                                           EXCLUDED.geom_official,
+
+                                                           last_fetched_at =
+                                                           COALESCE(
+                                                           EXCLUDED.last_fetched_at,
+                                                           cadastral_parcels.last_fetched_at
+                                                           ),
+
+                                                           updated_at = EXCLUDED.updated_at
+                        """
+                    ),
+                    {
+                        "cadastral_ref": parcel.cadastral_ref,
+                        "geometry": geometry_json,
+                        "last_fetched_at": parcel.last_fetched_at,
+                        "created_at": parcel.created_at,
+                        "updated_at": parcel.updated_at,
+                        "now": now,
+                    },
+                )
+
+                # ---------------------------------------------
+                # Resolve backup group to user's actual group.
+                # ---------------------------------------------
+
+                destination_group_id = None
+
+                if parcel.group_id is not None:
+                    destination_group_id = group_id_map[
+                        parcel.group_id
+                    ]
+
+                # ---------------------------------------------
+                # User-specific parcel data
+                # ---------------------------------------------
+
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO user_parcels (
+                            user_id,
                             cadastral_ref,
                             name,
                             notes,
                             color,
                             group_id,
                             is_deleted,
-                            geom_official,
                             created_at,
                             updated_at,
-                            last_fetched_at,
                             deleted_at
                         )
                         VALUES (
-                            :cadastral_ref,
-                            :name,
-                            :notes,
-                            :color,
-                            CAST(:group_id AS uuid),
-                            :is_deleted,
-                            ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(:geometry), 4326)),
-                            COALESCE(:created_at, :now),
-                            COALESCE(:updated_at, :now),
-                            :last_fetched_at,
-                            :deleted_at
+                                   CAST(:user_id AS uuid),
+                                   :cadastral_ref,
+                                   :name,
+                                   :notes,
+                                   :color,
+                                   CAST(
+                                           NULLIF(:group_id, '')
+                                       AS uuid
+                                   ),
+                                   :is_deleted,
+                                   COALESCE(:created_at, :now),
+                                   COALESCE(:updated_at, :now),
+                                   :deleted_at
+                               )
+
+                            ON CONFLICT (
+                            user_id,
+                            cadastral_ref
                         )
-                        ON CONFLICT (cadastral_ref) DO UPDATE
-                        SET
-                            name = EXCLUDED.name,
-                            notes = EXCLUDED.notes,
-                            color = EXCLUDED.color,
-                            group_id = EXCLUDED.group_id,
-                            is_deleted = EXCLUDED.is_deleted,
-                            geom_official = EXCLUDED.geom_official,
-                            created_at = EXCLUDED.created_at,
-                            updated_at = EXCLUDED.updated_at,
-                            last_fetched_at = EXCLUDED.last_fetched_at,
-                            deleted_at = EXCLUDED.deleted_at
+                        DO UPDATE
+                                                           SET
+                                                               name = EXCLUDED.name,
+                                                           notes = EXCLUDED.notes,
+                                                           color = EXCLUDED.color,
+                                                           group_id = EXCLUDED.group_id,
+                                                           is_deleted = EXCLUDED.is_deleted,
+                                                           created_at = EXCLUDED.created_at,
+                                                           updated_at = EXCLUDED.updated_at,
+                                                           deleted_at = EXCLUDED.deleted_at
                         """
                     ),
                     {
+                        "user_id": user_id,
                         "cadastral_ref": parcel.cadastral_ref,
                         "name": parcel.name,
                         "notes": parcel.notes,
                         "color": parcel.color,
-                        "group_id": parcel.group_id,
+                        "group_id": destination_group_id or "",
                         "is_deleted": parcel.is_deleted,
-                        "geometry": json.dumps(parcel.geometry, separators=(",", ":")),
                         "created_at": parcel.created_at,
                         "updated_at": parcel.updated_at,
-                        "last_fetched_at": parcel.last_fetched_at,
                         "deleted_at": parcel.deleted_at,
                         "now": now,
                     },
                 )
+
     except SQLAlchemyError as exc:
         raise HTTPException(
             status_code=400,
-            detail="No se pudo importar el backup. No se ha aplicado ningún cambio.",
+            detail=(
+                "No se pudo importar el backup. "
+                "No se ha aplicado ningún cambio."
+            ),
         ) from exc
 
     return ImportResult(

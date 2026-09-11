@@ -13,6 +13,59 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 class Base(DeclarativeBase):
     pass
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+
+    email: Mapped[str] = mapped_column(
+        String(320),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    password_hash: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    display_name: Mapped[str | None] = mapped_column(
+        String(120),
+        nullable=True,
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )
+
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
 class ParcelGroup(Base):
     __tablename__ = "parcel_groups"
@@ -22,6 +75,12 @@ class ParcelGroup(Base):
         primary_key=True,
         default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     is_hidden: Mapped[bool] = mapped_column(
@@ -41,46 +100,116 @@ class ParcelGroup(Base):
     )
 
 
-class Parcel(Base):
-    __tablename__ = "parcels"
+class CadastralParcel(Base):
+    __tablename__ = "cadastral_parcels"
 
-    cadastral_ref: Mapped[str] = mapped_column(String(20), primary_key=True)
-    name: Mapped[str | None] = mapped_column(String(160), nullable=True)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    color: Mapped[str] = mapped_column(
-        String(7),
-        nullable=False,
-        default="#7c3aed",
-        server_default=text("'#7c3aed'"),
+    cadastral_ref: Mapped[str] = mapped_column(
+        String(20),
+        primary_key=True,
     )
-    group_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("parcel_groups.id", ondelete="SET NULL"),
+
+    geom_official: Mapped[WKBElement | None] = mapped_column(
+        Geometry(
+            geometry_type="MULTIPOLYGON",
+            srid=4326,
+        ),
         nullable=True,
-        index=True,
     )
-    is_deleted: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False,
-        server_default=text("false"),
-        index=True,
+
+    last_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
-    geom_official: Mapped[WKBElement] = mapped_column(
-        Geometry(geometry_type="MULTIPOLYGON", srid=4326), nullable=False
-    )
+
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
     )
+
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
     )
-    last_fetched_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+
+
+class UserParcel(Base):
+    __tablename__ = "user_parcels"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
     )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    cadastral_ref: Mapped[str] = mapped_column(
+        String(20),
+        ForeignKey(
+            "cadastral_parcels.cadastral_ref",
+            ondelete="RESTRICT",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    name: Mapped[str | None] = mapped_column(
+        String(160),
+        nullable=True,
+    )
+
+    notes: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    color: Mapped[str] = mapped_column(
+        String(7),
+        nullable=False,
+        default="#7c3aed",
+        server_default=text("'#7c3aed'"),
+    )
+
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "parcel_groups.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    is_deleted: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
     deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        DateTime(timezone=True),
+        nullable=True,
     )

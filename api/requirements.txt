@@ -5,3 +5,8 @@ SQLAlchemy==2.0.52
 GeoAlchemy2==0.20.0
 Shapely==2.1.2
 httpx==0.28.1
+
+alembic
+argon2-cffi
+PyJWT
+email-validator

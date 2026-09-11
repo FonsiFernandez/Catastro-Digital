@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import init_db
-from .routers import backup, groups, parcels, wms_proxy
+from .routers import backup, groups, parcels, wms_proxy, auth, users
 
 
 def _cors_origins() -> list[str]:
@@ -43,6 +43,8 @@ app.include_router(parcels.router)
 app.include_router(backup.router)
 app.include_router(groups.router)
 app.include_router(wms_proxy.router)
+app.include_router(auth.router)
+app.include_router(users.router)
 
 
 @app.get("/health", tags=["system"])
