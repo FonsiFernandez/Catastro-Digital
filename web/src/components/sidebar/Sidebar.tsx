@@ -152,7 +152,7 @@ export function Sidebar({
         onIncludeDeleted={onIncludeDeleted}
       />
 
-      <DataTools onRefresh={onRefresh} onNotice={onNotice} />
+      <DataTools isGuest={isGuest} onRefresh={onRefresh} onNotice={onNotice} />
 
       <LandSummary parcels={parcels} groups={groups} />
 
