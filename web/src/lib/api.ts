@@ -202,6 +202,21 @@ export const cadastreApi = {
         body: JSON.stringify({ longitude, latitude }),
       });
     },
+    previewIdentify(
+        longitude: number,
+        latitude: number,
+    ): Promise<ParcelIdentification> {
+      return request<ParcelIdentification>(
+          "/parcels/preview-identify",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              longitude,
+              latitude,
+            }),
+          },
+      );
+    },
     list(includeDeleted = false): Promise<ParcelFeatureCollection> {
       const query = includeDeleted ? "?include_deleted=true" : "";
       return request<ParcelFeatureCollection>(`/parcels${query}`);

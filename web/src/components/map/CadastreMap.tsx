@@ -57,6 +57,7 @@ export type CadastreMapHandle = {
   fitParcel: (parcel: ParcelFeature) => void;
   fitAll: () => void;
   centerLocation: (location: DeviceLocation) => void;
+  clearFieldMode: () => void;
 };
 
 type CadastreMapProps = {
@@ -64,7 +65,6 @@ type CadastreMapProps = {
   selectedRc: string | null;
   showCatastro: boolean;
   baseMap: BaseMapId;
-  identifyMode: boolean;
   previewParcel: ParcelFeature | null;
   fieldMode: boolean;
   fieldLocation: DeviceLocation | null;
@@ -268,9 +268,9 @@ function addApplicationLayers(map: MapLibreMap): void {
 }
 
 function updateFieldLayers(
-  map: MapLibreMap,
-  location: DeviceLocation | null,
-  target: FieldTarget | null,
+    map: MapLibreMap,
+    location: DeviceLocation | null,
+    target: FieldTarget | null,
 ): void {
   const accuracySource = map.getSource(FIELD_ACCURACY_SOURCE_ID) as GeoJSONSource | undefined;
   const locationSource = map.getSource(FIELD_LOCATION_SOURCE_ID) as GeoJSONSource | undefined;
@@ -304,233 +304,329 @@ function updateFieldLayers(
   }
 }
 
+function clearFieldLayers(map: MapLibreMap): void {
+  const accuracySource = map.getSource(
+      FIELD_ACCURACY_SOURCE_ID,
+  ) as GeoJSONSource | undefined;
+
+  const locationSource = map.getSource(
+      FIELD_LOCATION_SOURCE_ID,
+  ) as GeoJSONSource | undefined;
+
+  const boundarySource = map.getSource(
+      FIELD_BOUNDARY_SOURCE_ID,
+  ) as GeoJSONSource | undefined;
+
+  accuracySource?.setData(EMPTY_COLLECTION);
+  locationSource?.setData(EMPTY_COLLECTION);
+  boundarySource?.setData(EMPTY_COLLECTION);
+
+  if (map.getLayer(FIELD_TARGET_LAYER_ID)) {
+    map.setFilter(FIELD_TARGET_LAYER_ID, [
+      "==",
+      ["get", "cadastral_ref"],
+      "",
+    ]);
+  }
+}
+
 export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
-  function CadastreMap(
-    {
-      parcels,
-      selectedRc,
-      showCatastro,
-      baseMap,
-      identifyMode,
-      previewParcel,
-      fieldMode,
-      fieldLocation,
-      fieldTarget,
-      onSelectParcel,
-      onIdentifyPoint,
-    },
-    ref,
-  ) {
-    const containerRef = useRef<HTMLDivElement | null>(null);
-    const mapRef = useRef<MapLibreMap | null>(null);
-    const mapReadyRef = useRef(false);
-    const pendingFitRef = useRef<ParcelFeature | null>(null);
-    const pendingFitAllRef = useRef(false);
-    const parcelsRef = useRef(parcels);
-    const selectedRcRef = useRef(selectedRc);
-    const showCatastroRef = useRef(showCatastro);
-    const baseMapRef = useRef(baseMap);
-    const identifyModeRef = useRef(identifyMode);
-    const previewParcelRef = useRef(previewParcel);
-    const fieldLocationRef = useRef(fieldLocation);
-    const fieldTargetRef = useRef(fieldTarget);
-    const onSelectRef = useRef(onSelectParcel);
-    const onIdentifyRef = useRef(onIdentifyPoint);
+    function CadastreMap(
+        {
+          parcels,
+          selectedRc,
+          showCatastro,
+          baseMap,
+          previewParcel,
+          fieldMode,
+          fieldLocation,
+          fieldTarget,
+          onSelectParcel,
+          onIdentifyPoint,
+        },
+        ref,
+    ) {
+      const containerRef = useRef<HTMLDivElement | null>(null);
+      const mapRef = useRef<MapLibreMap | null>(null);
+      const mapReadyRef = useRef(false);
+      const pendingFitRef = useRef<ParcelFeature | null>(null);
+      const pendingFitAllRef = useRef(false);
+      const parcelsRef = useRef(parcels);
+      const selectedRcRef = useRef(selectedRc);
+      const showCatastroRef = useRef(showCatastro);
+      const baseMapRef = useRef(baseMap);
+      const previewParcelRef = useRef(previewParcel);
+      const fieldModeRef = useRef(fieldMode);
+      const fieldLocationRef = useRef(fieldLocation);
+      const fieldTargetRef = useRef(fieldTarget);
+      const onSelectRef = useRef(onSelectParcel);
+      const onIdentifyRef = useRef(onIdentifyPoint);
 
-    parcelsRef.current = parcels;
-    selectedRcRef.current = selectedRc;
-    showCatastroRef.current = showCatastro;
-    baseMapRef.current = baseMap;
-    identifyModeRef.current = identifyMode;
-    previewParcelRef.current = previewParcel;
-    fieldLocationRef.current = fieldLocation;
-    fieldTargetRef.current = fieldTarget;
-    onSelectRef.current = onSelectParcel;
-    onIdentifyRef.current = onIdentifyPoint;
+      parcelsRef.current = parcels;
+      selectedRcRef.current = selectedRc;
+      showCatastroRef.current = showCatastro;
+      baseMapRef.current = baseMap;
+      previewParcelRef.current = previewParcel;
+      fieldModeRef.current = fieldMode;
+      fieldLocationRef.current = fieldLocation;
+      fieldTargetRef.current = fieldTarget;
+      onSelectRef.current = onSelectParcel;
+      onIdentifyRef.current = onIdentifyPoint;
 
-    useImperativeHandle(ref, () => ({
-      fitParcel(parcel) {
-        const map = mapRef.current;
-        if (map && mapReadyRef.current) {
-          fitToFeature(map, parcel);
-          return;
-        }
-        pendingFitRef.current = parcel;
-      },
-      fitAll() {
-        const map = mapRef.current;
-        if (map && mapReadyRef.current) {
-          fitToFeatures(map, parcelsRef.current);
-          return;
-        }
-        pendingFitAllRef.current = true;
-      },
-      centerLocation(location) {
-        const map = mapRef.current;
-        if (!map || !mapReadyRef.current) return;
-        map.easeTo({
-          center: [location.longitude, location.latitude],
-          zoom: Math.max(map.getZoom(), 18),
-          duration: 600,
+      useImperativeHandle(ref, () => ({
+        fitParcel(parcel) {
+          const map = mapRef.current;
+          if (map && mapReadyRef.current) {
+            fitToFeature(map, parcel);
+            return;
+          }
+          pendingFitRef.current = parcel;
+        },
+        fitAll() {
+          const map = mapRef.current;
+          if (map && mapReadyRef.current) {
+            fitToFeatures(map, parcelsRef.current);
+            return;
+          }
+          pendingFitAllRef.current = true;
+        },
+        centerLocation(location) {
+          const map = mapRef.current;
+          if (!map || !mapReadyRef.current) return;
+          map.easeTo({
+            center: [location.longitude, location.latitude],
+            zoom: Math.max(map.getZoom(), 18),
+            duration: 600,
+          });
+        },
+        clearFieldMode() {
+          const map = mapRef.current;
+          if (!map || !mapReadyRef.current) return;
+          clearFieldLayers(map);
+        },
+      }), []);
+
+      useEffect(() => {
+        if (!containerRef.current || mapRef.current) return;
+
+        setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+
+        const map = new MapLibreMapClass({
+          container: containerRef.current,
+          style: BASE_MAP_STYLE,
+          center: [-3.7038, 40.4168],
+          zoom: 5.2,
+          minZoom: 3,
+          maxZoom: 20,
+          attributionControl: false,
         });
-      },
-    }), []);
 
-    useEffect(() => {
-      if (!containerRef.current || mapRef.current) return;
+        map.addControl(new NavigationControl({ showCompass: true }), "top-right");
+        map.addControl(new ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-right");
+        map.addControl(new AttributionControl({ compact: true }), "bottom-right");
 
-      setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+        map.on("load", () => {
+          addApplicationLayers(map);
+          mapReadyRef.current = true;
+          setBaseMapVisibility(map, baseMapRef.current);
 
-      const map = new MapLibreMapClass({
-        container: containerRef.current,
-        style: BASE_MAP_STYLE,
-        center: [-3.7038, 40.4168],
-        zoom: 5.2,
-        minZoom: 3,
-        maxZoom: 20,
-        attributionControl: false,
-      });
+          const source = map.getSource(PARCEL_SOURCE_ID) as GeoJSONSource | undefined;
+          source?.setData(asFeatureCollection(parcelsRef.current));
 
-      map.addControl(new NavigationControl({ showCompass: true }), "top-right");
-      map.addControl(new ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-right");
-      map.addControl(new AttributionControl({ compact: true }), "bottom-right");
+          const previewSource = map.getSource(PARCEL_PREVIEW_SOURCE_ID) as GeoJSONSource | undefined;
+          previewSource?.setData(
+              asFeatureCollection(previewParcelRef.current ? [previewParcelRef.current] : []),
+          );
 
-      map.on("load", () => {
-        addApplicationLayers(map);
-        mapReadyRef.current = true;
-        setBaseMapVisibility(map, baseMapRef.current);
+          map.setLayoutProperty(
+              CATASTRO_LAYER_ID,
+              "visibility",
+              showCatastroRef.current ? "visible" : "none",
+          );
+          map.setFilter(PARCEL_SELECTED_LAYER_ID, [
+            "==",
+            ["get", "cadastral_ref"],
+            selectedRcRef.current ?? "",
+          ]);
+          updateFieldLayers(map, fieldLocationRef.current, fieldTargetRef.current);
 
+          map.getCanvas().style.cursor = fieldModeRef.current ? "" : "crosshair";
+
+          if (pendingFitRef.current) {
+            fitToFeature(map, pendingFitRef.current);
+            pendingFitRef.current = null;
+          } else if (pendingFitAllRef.current) {
+            fitToFeatures(map, parcelsRef.current);
+          }
+          pendingFitAllRef.current = false;
+        });
+
+        map.on("error", (event) => {
+          console.error("MapLibre error:", event.error ?? event);
+        });
+
+        /*
+         * A normal click/tap selects a parcel.
+         *
+         * MapLibre already distinguishes a click/tap from a drag gesture,
+         * so moving the map does not trigger parcel identification.
+         *
+         * Saved parcels are handled first. This prevents a click on an
+         * already saved parcel from also launching a Catastro lookup.
+         */
+        map.on("click", (event: MapMouseEvent) => {
+          const savedFeatures = map.queryRenderedFeatures(
+              event.point,
+              {
+                layers: [PARCEL_FILL_LAYER_ID],
+              },
+          );
+
+          const savedCadastralRef =
+              savedFeatures[0]?.properties
+                  ?.cadastral_ref as
+                  | string
+                  | undefined;
+
+          if (savedCadastralRef) {
+            onSelectRef.current(
+                savedCadastralRef,
+            );
+            return;
+          }
+
+          /*
+           * If the user clicks the parcel currently being previewed,
+           * keep the existing preview instead of identifying it again.
+           */
+          const previewFeatures =
+              map.queryRenderedFeatures(
+                  event.point,
+                  {
+                    layers: [
+                      PARCEL_PREVIEW_FILL_LAYER_ID,
+                    ],
+                  },
+              );
+
+          if (previewFeatures.length > 0) {
+            return;
+          }
+
+          if (fieldModeRef.current) {
+            return;
+          }
+
+          onIdentifyRef.current(
+              event.lngLat.lng,
+              event.lngLat.lat,
+          );
+        });
+
+        map.on(
+            "mouseenter",
+            PARCEL_FILL_LAYER_ID,
+            () => {
+              map.getCanvas().style.cursor =
+                  "pointer";
+            },
+        );
+
+        map.on(
+            "mouseleave",
+            PARCEL_FILL_LAYER_ID,
+            () => {
+              map.getCanvas().style.cursor =
+                  fieldModeRef.current
+                      ? ""
+                      : "crosshair";
+            },
+        );
+
+        const observer = new ResizeObserver(() => map.resize());
+        observer.observe(containerRef.current);
+
+        mapRef.current = map;
+        return () => {
+          observer.disconnect();
+          mapReadyRef.current = false;
+          pendingFitRef.current = null;
+          pendingFitAllRef.current = false;
+          map.remove();
+          mapRef.current = null;
+        };
+      }, []);
+
+      useEffect(() => {
+        const map = mapRef.current;
+        if (!map?.isStyleLoaded()) return;
         const source = map.getSource(PARCEL_SOURCE_ID) as GeoJSONSource | undefined;
-        source?.setData(asFeatureCollection(parcelsRef.current));
+        source?.setData(asFeatureCollection(parcels));
+      }, [parcels]);
 
-        const previewSource = map.getSource(PARCEL_PREVIEW_SOURCE_ID) as GeoJSONSource | undefined;
-        previewSource?.setData(
-          asFeatureCollection(previewParcelRef.current ? [previewParcelRef.current] : []),
-        );
+      useEffect(() => {
+        const map = mapRef.current;
+        if (!map?.isStyleLoaded()) return;
+        const source = map.getSource(PARCEL_PREVIEW_SOURCE_ID) as GeoJSONSource | undefined;
+        source?.setData(asFeatureCollection(previewParcel ? [previewParcel] : []));
+        if (previewParcel) fitToFeature(map, previewParcel);
+      }, [previewParcel]);
 
+      useEffect(() => {
+        const map = mapRef.current;
+        if (!map?.isStyleLoaded()) return;
+        setBaseMapVisibility(map, baseMap);
+      }, [baseMap]);
+
+      useEffect(() => {
+        const map = mapRef.current;
+        if (!map?.isStyleLoaded() || !map.getLayer(CATASTRO_LAYER_ID)) return;
         map.setLayoutProperty(
-          CATASTRO_LAYER_ID,
-          "visibility",
-          showCatastroRef.current ? "visible" : "none",
+            CATASTRO_LAYER_ID,
+            "visibility",
+            showCatastro ? "visible" : "none",
         );
+      }, [showCatastro]);
+
+      useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+        map.getCanvas().style.cursor = fieldMode ? "" : "crosshair";
+      }, [fieldMode]);
+
+      useEffect(() => {
+        const map = mapRef.current;
+        if (!map?.isStyleLoaded() || !map.getLayer(PARCEL_SELECTED_LAYER_ID)) return;
         map.setFilter(PARCEL_SELECTED_LAYER_ID, [
           "==",
           ["get", "cadastral_ref"],
-          selectedRcRef.current ?? "",
+          selectedRc ?? "",
         ]);
-        updateFieldLayers(map, fieldLocationRef.current, fieldTargetRef.current);
 
-        map.getCanvas().style.cursor = identifyModeRef.current ? "crosshair" : "";
-
-        if (pendingFitRef.current) {
-          fitToFeature(map, pendingFitRef.current);
-          pendingFitRef.current = null;
-        } else if (pendingFitAllRef.current) {
-          fitToFeatures(map, parcelsRef.current);
+        if (selectedRc && !fieldMode) {
+          const selected = parcelsRef.current.find(
+              (parcel) => parcel.properties.cadastral_ref === selectedRc,
+          );
+          if (selected) fitToFeature(map, selected);
         }
-        pendingFitAllRef.current = false;
-      });
+      }, [fieldMode, selectedRc]);
 
-      map.on("error", (event) => {
-        console.error("MapLibre error:", event.error ?? event);
-      });
+      useEffect(() => {
+        const map = mapRef.current;
+        if (!map?.isStyleLoaded()) return;
 
-      map.on("click", PARCEL_FILL_LAYER_ID, (event) => {
-        if (identifyModeRef.current) return;
-        const cadastralRef = event.features?.[0]?.properties?.cadastral_ref as string | undefined;
-        if (cadastralRef) onSelectRef.current(cadastralRef);
-      });
+        if (!fieldMode) {
+          clearFieldLayers(map);
+          return;
+        }
 
-      map.on("click", (event: MapMouseEvent) => {
-        if (!identifyModeRef.current) return;
-        onIdentifyRef.current(event.lngLat.lng, event.lngLat.lat);
-      });
-
-      map.on("mouseenter", PARCEL_FILL_LAYER_ID, () => {
-        map.getCanvas().style.cursor = identifyModeRef.current ? "crosshair" : "pointer";
-      });
-      map.on("mouseleave", PARCEL_FILL_LAYER_ID, () => {
-        map.getCanvas().style.cursor = identifyModeRef.current ? "crosshair" : "";
-      });
-
-      const observer = new ResizeObserver(() => map.resize());
-      observer.observe(containerRef.current);
-
-      mapRef.current = map;
-      return () => {
-        observer.disconnect();
-        mapReadyRef.current = false;
-        pendingFitRef.current = null;
-        pendingFitAllRef.current = false;
-        map.remove();
-        mapRef.current = null;
-      };
-    }, []);
-
-    useEffect(() => {
-      const map = mapRef.current;
-      if (!map?.isStyleLoaded()) return;
-      const source = map.getSource(PARCEL_SOURCE_ID) as GeoJSONSource | undefined;
-      source?.setData(asFeatureCollection(parcels));
-    }, [parcels]);
-
-    useEffect(() => {
-      const map = mapRef.current;
-      if (!map?.isStyleLoaded()) return;
-      const source = map.getSource(PARCEL_PREVIEW_SOURCE_ID) as GeoJSONSource | undefined;
-      source?.setData(asFeatureCollection(previewParcel ? [previewParcel] : []));
-      if (previewParcel) fitToFeature(map, previewParcel);
-    }, [previewParcel]);
-
-    useEffect(() => {
-      const map = mapRef.current;
-      if (!map?.isStyleLoaded()) return;
-      setBaseMapVisibility(map, baseMap);
-    }, [baseMap]);
-
-    useEffect(() => {
-      const map = mapRef.current;
-      if (!map?.isStyleLoaded() || !map.getLayer(CATASTRO_LAYER_ID)) return;
-      map.setLayoutProperty(
-        CATASTRO_LAYER_ID,
-        "visibility",
-        showCatastro ? "visible" : "none",
-      );
-    }, [showCatastro]);
-
-    useEffect(() => {
-      const map = mapRef.current;
-      if (!map) return;
-      map.getCanvas().style.cursor = identifyMode ? "crosshair" : "";
-    }, [identifyMode]);
-
-    useEffect(() => {
-      const map = mapRef.current;
-      if (!map?.isStyleLoaded() || !map.getLayer(PARCEL_SELECTED_LAYER_ID)) return;
-      map.setFilter(PARCEL_SELECTED_LAYER_ID, [
-        "==",
-        ["get", "cadastral_ref"],
-        selectedRc ?? "",
-      ]);
-
-      if (selectedRc && !fieldMode) {
-        const selected = parcelsRef.current.find(
-          (parcel) => parcel.properties.cadastral_ref === selectedRc,
+        updateFieldLayers(
+            map,
+            fieldLocation,
+            fieldTarget,
         );
-        if (selected) fitToFeature(map, selected);
-      }
-    }, [fieldMode, selectedRc]);
+      }, [fieldLocation, fieldMode, fieldTarget]);
 
-    useEffect(() => {
-      const map = mapRef.current;
-      if (!map?.isStyleLoaded()) return;
-      updateFieldLayers(
-        map,
-        fieldMode ? fieldLocation : null,
-        fieldMode ? fieldTarget : null,
-      );
-    }, [fieldLocation, fieldMode, fieldTarget]);
-
-    return <div ref={containerRef} className="cad-map" aria-label="Mapa de parcelas" />;
-  },
+      return <div ref={containerRef} className="cad-map" aria-label="Mapa de parcelas" />;
+    },
 );

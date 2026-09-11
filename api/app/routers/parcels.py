@@ -346,6 +346,264 @@ async def preview_parcel(
         }
     }
 
+@router.post("/preview-identify")
+async def preview_identify_parcel(
+        payload: ParcelIdentifyRequest,
+) -> dict[str, Any]:
+    """
+    Public read-only parcel identification.
+
+    Used by guest mode. It never reads or writes user_parcels.
+    """
+
+    point_wkt = f"POINT({payload.longitude} {payload.latitude})"
+
+    # ---------------------------------------------------------
+    # 1. Reuse globally cached cadastral geometry.
+    # ---------------------------------------------------------
+
+    with engine.begin() as conn:
+        cached_row = conn.execute(
+            text(
+                """
+                SELECT
+                    cadastral_ref,
+                    ST_AsGeoJSON(geom_official) AS geom,
+                    ST_Area(
+                            geom_official::geography
+                    )::double precision AS area_m2,
+                    (
+                        ST_Area(
+                            geom_official::geography
+                        ) / 10000.0
+                    )::double precision AS area_ha,
+                    ST_Perimeter(
+                        geom_official::geography
+                    )::double precision AS perimeter_m
+                FROM cadastral_parcels
+                WHERE ST_Covers(
+                    geom_official,
+                    ST_GeomFromText(:point_wkt, 4326)
+                    )
+                ORDER BY updated_at DESC
+                    LIMIT 1
+                """
+            ),
+            {
+                "point_wkt": point_wkt,
+            },
+        ).mappings().first()
+
+    if cached_row:
+        return {
+            "parcel": {
+                "type": "Feature",
+                "geometry": json.loads(
+                    cached_row["geom"]
+                ),
+                "properties": {
+                    "cadastral_ref":
+                        cached_row[
+                            "cadastral_ref"
+                        ],
+
+                    "name": None,
+                    "notes": None,
+                    "color": DEFAULT_COLOR,
+                    "group_id": None,
+                    "is_deleted": False,
+
+                    "area_m2": _metric(
+                        cached_row[
+                            "area_m2"
+                        ]
+                    ),
+
+                    "area_ha": _metric(
+                        cached_row[
+                            "area_ha"
+                        ]
+                    ),
+
+                    "perimeter_m": _metric(
+                        cached_row[
+                            "perimeter_m"
+                        ]
+                    ),
+
+                    "source":
+                        "cadastral_cache",
+                },
+            },
+
+            "already_saved": False,
+        }
+
+    # ---------------------------------------------------------
+    # 2. Nothing cached. Ask Catastro.
+    # ---------------------------------------------------------
+
+    if is_denied():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Catastro está bloqueado temporalmente por rate-limit. "
+                f"Reintenta en ~{remaining_seconds()}s. "
+                f"Motivo: {deny_reason()}"
+            ),
+        )
+
+    try:
+        xml_text, srs_used = (
+            await fetch_parcels_around_point_gml(
+                payload.longitude,
+                payload.latitude,
+            )
+        )
+
+        features = (
+            gml_text_to_geojson_features(
+                xml_text
+            )
+        )
+
+    except Exception as exc:
+        message = str(exc) or repr(exc)
+
+        if _catastro_error_is_rate_limit(
+                message
+        ):
+            deny_for(
+                60 * 60,
+                "Límite de peticiones por hora (Catastro)",
+                )
+
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Catastro ha limitado "
+                    "temporalmente las consultas "
+                    "desde el mapa"
+                ),
+            ) from exc
+
+        if (
+                "sin features"
+                in message.lower()
+        ):
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "No se encontró una parcela "
+                    "en ese punto"
+                ),
+            ) from exc
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Error identificando parcela "
+                f"en Catastro: "
+                f"{type(exc).__name__}: "
+                f"{message}"
+            ),
+        ) from exc
+
+    # ---------------------------------------------------------
+    # 3. Find the polygon exactly underneath the click.
+    # ---------------------------------------------------------
+
+    click_point = Point(
+        payload.longitude,
+        payload.latitude,
+    )
+
+    matches: list[
+        tuple[
+            float,
+            dict[str, Any],
+            str,
+        ]
+    ] = []
+
+    for feature in features:
+        geometry = feature.get(
+            "geometry"
+        )
+
+        if not geometry:
+            continue
+
+        try:
+            polygon = shape(
+                geometry
+            )
+        except Exception:
+            continue
+
+        if (
+                polygon.is_empty
+                or not polygon.covers(
+            click_point
+        )
+        ):
+            continue
+
+        rc = _extract_cadastral_ref(
+            feature.get(
+                "properties"
+            )
+            or {}
+        )
+
+        if not rc:
+            continue
+
+        matches.append(
+            (
+                polygon.area,
+                feature,
+                rc,
+            )
+        )
+
+    if not matches:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No se pudo identificar una "
+                "parcela exactamente bajo ese punto"
+            ),
+        )
+
+    _, feature, rc = min(
+        matches,
+        key=lambda item: item[0],
+    )
+
+    # ---------------------------------------------------------
+    # 4. Return preview only.
+    # ---------------------------------------------------------
+
+    feature["properties"] = {
+        "cadastral_ref": rc,
+        "name": None,
+        "notes": None,
+        "color": DEFAULT_COLOR,
+        "group_id": None,
+        "is_deleted": False,
+        "area_m2": None,
+        "area_ha": None,
+        "perimeter_m": None,
+        "source": "catastro_wfs_bbox",
+        "srs_in": srs_used,
+    }
+
+    return {
+        "parcel": feature,
+        "already_saved": False,
+    }
+
 @router.post("/identify")
 async def identify_parcel(
         payload: ParcelIdentifyRequest,
