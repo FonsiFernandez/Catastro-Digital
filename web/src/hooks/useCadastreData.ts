@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { cadastreApi, readableApiError } from "@/lib/api";
+import {
+  cadastreApi,
+  readableApiError,
+} from "@/lib/api";
+
+import { guestDb } from "@/lib/guestDb";
+
 import type {
   GroupUpdate,
   NoticeState,
@@ -11,37 +17,71 @@ import type {
   ParcelUpdate,
 } from "@/types/cadastre";
 
+
 export function useCadastreData(
     includeDeleted: boolean,
-    enabled = true,
+    authenticated: boolean,
 ) {
   const [groups, setGroups] = useState<ParcelGroup[]>([]);
   const [parcels, setParcels] = useState<ParcelFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<NoticeState>(null);
 
-  const clearNotice = useCallback(() => setNotice(null), []);
+  const clearNotice = useCallback(
+      () => setNotice(null),
+      [],
+  );
+
+
+  // -----------------------------------------------------------------------
+  // Refresh groups
+  // -----------------------------------------------------------------------
 
   const refreshGroups = useCallback(async () => {
-    const nextGroups = await cadastreApi.groups.list();
-    setGroups(nextGroups);
-    return nextGroups;
-  }, []);
+    const nextGroups = authenticated
+        ? await cadastreApi.groups.list()
+        : await guestDb.listGroups();
 
-  const refreshParcels = useCallback(async (deleted = includeDeleted) => {
-    const collection = await cadastreApi.parcels.list(deleted);
-    setParcels(collection.features);
-    return collection.features;
-  }, [includeDeleted]);
+    setGroups(nextGroups);
+
+    return nextGroups;
+  }, [authenticated]);
+
+
+  // -----------------------------------------------------------------------
+  // Refresh parcels
+  // -----------------------------------------------------------------------
+
+  const refreshParcels = useCallback(
+      async (deleted = includeDeleted) => {
+        if (authenticated) {
+          const collection =
+              await cadastreApi.parcels.list(deleted);
+
+          setParcels(collection.features);
+
+          return collection.features;
+        }
+
+        const nextParcels =
+            await guestDb.listParcels(deleted);
+
+        setParcels(nextParcels);
+
+        return nextParcels;
+      },
+      [
+        authenticated,
+        includeDeleted,
+      ],
+  );
+
+
+  // -----------------------------------------------------------------------
+  // Refresh everything
+  // -----------------------------------------------------------------------
 
   const refreshAll = useCallback(async () => {
-    if (!enabled) {
-      setGroups([]);
-      setParcels([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -54,147 +94,400 @@ export function useCadastreData(
         type: "error",
         message: readableApiError(
             error,
-            "No se pudieron cargar los datos",
+            authenticated
+                ? "No se pudieron cargar los datos"
+                : "No se pudieron cargar los datos locales",
         ),
       });
     } finally {
       setLoading(false);
     }
   }, [
-    enabled,
+    authenticated,
     refreshGroups,
     refreshParcels,
   ]);
 
+
   useEffect(() => {
-    if (!enabled) {
-      setGroups([]);
-      setParcels([]);
-      setLoading(false);
-      return;
-    }
-
     void refreshAll();
-  }, [enabled, refreshAll]);
+  }, [refreshAll]);
 
-  const identifyParcel = useCallback(async (longitude: number, latitude: number) => {
-    return cadastreApi.parcels.identify(longitude, latitude);
-  }, []);
 
-  const fieldPosition = useCallback(async (longitude: number, latitude: number, selectedRef?: string | null) => {
-    return cadastreApi.parcels.fieldPosition(longitude, latitude, selectedRef);
-  }, []);
+  // -----------------------------------------------------------------------
+  // Identify
+  //
+  // Authenticated mode works already.
+  // Guest preview will be connected to a public backend endpoint next.
+  // -----------------------------------------------------------------------
 
-  const lookupParcel = useCallback(async (cadastralRef: string) => {
-    const parcel = await cadastreApi.parcels.lookup(cadastralRef);
-    await Promise.all([refreshParcels(), refreshGroups()]);
-    setNotice({ type: "success", message: "Parcela cargada correctamente" });
-    return parcel;
-  }, [refreshGroups, refreshParcels]);
+  const identifyParcel = useCallback(
+      async (
+          longitude: number,
+          latitude: number,
+      ) => {
+        if (!authenticated) {
+          throw new Error(
+              "La selección de parcelas desde el mapa para invitados estará disponible en el siguiente paso.",
+          );
+        }
 
-  const updateParcel = useCallback(async (cadastralRef: string, update: ParcelUpdate) => {
-    // Optimistic UI keeps the inspector responsive, then the server remains source of truth.
-    setParcels((current) =>
-      current.map((feature) =>
-        feature.properties.cadastral_ref === cadastralRef
-          ? {
-              ...feature,
-              properties: { ...feature.properties, ...update },
-            }
-          : feature,
-      ),
-    );
+        return cadastreApi.parcels.identify(
+            longitude,
+            latitude,
+        );
+      },
+      [authenticated],
+  );
 
-    try {
-      await cadastreApi.parcels.update(cadastralRef, update);
-      if ("group_id" in update || "is_deleted" in update) {
-        await Promise.all([refreshParcels(), refreshGroups()]);
-      } else {
-        await refreshParcels();
-      }
-    } catch (error) {
-      await refreshParcels();
-      setNotice({
-        type: "error",
-        message: readableApiError(error, "No se pudo guardar la parcela"),
-      });
-      throw error;
-    }
-  }, [refreshGroups, refreshParcels]);
 
-  const deleteParcel = useCallback(async (cadastralRef: string) => {
-    try {
-      await cadastreApi.parcels.delete(cadastralRef);
-      await Promise.all([refreshParcels(), refreshGroups()]);
-      setNotice({ type: "success", message: "Parcela movida a borradas" });
-    } catch (error) {
-      setNotice({
-        type: "error",
-        message: readableApiError(error, "No se pudo borrar la parcela"),
-      });
-      throw error;
-    }
-  }, [refreshGroups, refreshParcels]);
+  // -----------------------------------------------------------------------
+  // Field mode
+  //
+  // For the moment field calculations continue using the authenticated
+  // backend. Local geometric field calculations will be added separately.
+  // -----------------------------------------------------------------------
 
-  const createGroup = useCallback(async (name: string) => {
-    try {
-      const group = await cadastreApi.groups.create(name);
-      await refreshGroups();
-      setNotice({ type: "success", message: `Grupo “${group.name}” creado` });
-      return group;
-    } catch (error) {
-      setNotice({
-        type: "error",
-        message: readableApiError(error, "No se pudo crear el grupo"),
-      });
-      throw error;
-    }
-  }, [refreshGroups]);
+  const fieldPosition = useCallback(
+      async (
+          longitude: number,
+          latitude: number,
+          selectedRef?: string | null,
+      ) => {
+        if (!authenticated) {
+          throw new Error(
+              "El modo campo requiere iniciar sesión por ahora.",
+          );
+        }
 
-  const updateGroup = useCallback(async (groupId: string, update: GroupUpdate) => {
-    setGroups((current) =>
-      current.map((group) => (group.id === groupId ? { ...group, ...update } : group)),
-    );
-    try {
-      await cadastreApi.groups.update(groupId, update);
-      await refreshGroups();
-    } catch (error) {
-      await refreshGroups();
-      setNotice({
-        type: "error",
-        message: readableApiError(error, "No se pudo actualizar el grupo"),
-      });
-      throw error;
-    }
-  }, [refreshGroups]);
+        return cadastreApi.parcels.fieldPosition(
+            longitude,
+            latitude,
+            selectedRef,
+        );
+      },
+      [authenticated],
+  );
 
-  const deleteGroup = useCallback(async (groupId: string) => {
-    try {
-      await cadastreApi.groups.delete(groupId);
-      await Promise.all([refreshGroups(), refreshParcels()]);
-      setNotice({ type: "success", message: "Grupo eliminado; sus parcelas quedan sin grupo" });
-    } catch (error) {
-      setNotice({
-        type: "error",
-        message: readableApiError(error, "No se pudo eliminar el grupo"),
-      });
-      throw error;
-    }
-  }, [refreshGroups, refreshParcels]);
+
+  // -----------------------------------------------------------------------
+  // Lookup
+  // -----------------------------------------------------------------------
+
+  const lookupParcel = useCallback(
+      async (
+          cadastralRef: string,
+      ) => {
+        if (!authenticated) {
+          throw new Error(
+              "La búsqueda catastral para invitados estará disponible en el siguiente paso.",
+          );
+        }
+
+        const parcel =
+            await cadastreApi.parcels.lookup(
+                cadastralRef,
+            );
+
+        await Promise.all([
+          refreshParcels(),
+          refreshGroups(),
+        ]);
+
+        setNotice({
+          type: "success",
+          message: "Parcela cargada correctamente",
+        });
+
+        return parcel;
+      },
+      [
+        authenticated,
+        refreshGroups,
+        refreshParcels,
+      ],
+  );
+
+
+  // -----------------------------------------------------------------------
+  // Update parcel
+  // -----------------------------------------------------------------------
+
+  const updateParcel = useCallback(
+      async (
+          cadastralRef: string,
+          update: ParcelUpdate,
+      ) => {
+        setParcels((current) =>
+            current.map((feature) =>
+                feature.properties.cadastral_ref === cadastralRef
+                    ? {
+                      ...feature,
+                      properties: {
+                        ...feature.properties,
+                        ...update,
+                      },
+                    }
+                    : feature,
+            ),
+        );
+
+        try {
+          if (authenticated) {
+            await cadastreApi.parcels.update(
+                cadastralRef,
+                update,
+            );
+          } else {
+            await guestDb.updateParcel(
+                cadastralRef,
+                update,
+            );
+          }
+
+          if (
+              "group_id" in update ||
+              "is_deleted" in update
+          ) {
+            await Promise.all([
+              refreshParcels(),
+              refreshGroups(),
+            ]);
+          } else {
+            await refreshParcels();
+          }
+        } catch (error) {
+          await refreshParcels();
+
+          setNotice({
+            type: "error",
+            message: readableApiError(
+                error,
+                "No se pudo guardar la parcela",
+            ),
+          });
+
+          throw error;
+        }
+      },
+      [
+        authenticated,
+        refreshGroups,
+        refreshParcels,
+      ],
+  );
+
+
+  // -----------------------------------------------------------------------
+  // Delete parcel
+  // -----------------------------------------------------------------------
+
+  const deleteParcel = useCallback(
+      async (
+          cadastralRef: string,
+      ) => {
+        try {
+          if (authenticated) {
+            await cadastreApi.parcels.delete(
+                cadastralRef,
+            );
+          } else {
+            await guestDb.deleteParcel(
+                cadastralRef,
+            );
+          }
+
+          await Promise.all([
+            refreshParcels(),
+            refreshGroups(),
+          ]);
+
+          setNotice({
+            type: "success",
+            message: "Parcela movida a borradas",
+          });
+        } catch (error) {
+          setNotice({
+            type: "error",
+            message: readableApiError(
+                error,
+                "No se pudo borrar la parcela",
+            ),
+          });
+
+          throw error;
+        }
+      },
+      [
+        authenticated,
+        refreshGroups,
+        refreshParcels,
+      ],
+  );
+
+
+  // -----------------------------------------------------------------------
+  // Create group
+  // -----------------------------------------------------------------------
+
+  const createGroup = useCallback(
+      async (
+          name: string,
+      ) => {
+        try {
+          const group = authenticated
+              ? await cadastreApi.groups.create(name)
+              : await guestDb.createGroup(name);
+
+          await refreshGroups();
+
+          setNotice({
+            type: "success",
+            message: `Grupo “${group.name}” creado`,
+          });
+
+          return group;
+        } catch (error) {
+          setNotice({
+            type: "error",
+            message: readableApiError(
+                error,
+                "No se pudo crear el grupo",
+            ),
+          });
+
+          throw error;
+        }
+      },
+      [
+        authenticated,
+        refreshGroups,
+      ],
+  );
+
+
+  // -----------------------------------------------------------------------
+  // Update group
+  // -----------------------------------------------------------------------
+
+  const updateGroup = useCallback(
+      async (
+          groupId: string,
+          update: GroupUpdate,
+      ) => {
+        setGroups((current) =>
+            current.map((group) =>
+                group.id === groupId
+                    ? {
+                      ...group,
+                      ...update,
+                    }
+                    : group,
+            ),
+        );
+
+        try {
+          if (authenticated) {
+            await cadastreApi.groups.update(
+                groupId,
+                update,
+            );
+          } else {
+            await guestDb.updateGroup(
+                groupId,
+                update,
+            );
+          }
+
+          await refreshGroups();
+        } catch (error) {
+          await refreshGroups();
+
+          setNotice({
+            type: "error",
+            message: readableApiError(
+                error,
+                "No se pudo actualizar el grupo",
+            ),
+          });
+
+          throw error;
+        }
+      },
+      [
+        authenticated,
+        refreshGroups,
+      ],
+  );
+
+
+  // -----------------------------------------------------------------------
+  // Delete group
+  // -----------------------------------------------------------------------
+
+  const deleteGroup = useCallback(
+      async (
+          groupId: string,
+      ) => {
+        try {
+          if (authenticated) {
+            await cadastreApi.groups.delete(
+                groupId,
+            );
+          } else {
+            await guestDb.deleteGroup(
+                groupId,
+            );
+          }
+
+          await Promise.all([
+            refreshGroups(),
+            refreshParcels(),
+          ]);
+
+          setNotice({
+            type: "success",
+            message:
+                "Grupo eliminado; sus parcelas quedan sin grupo",
+          });
+        } catch (error) {
+          setNotice({
+            type: "error",
+            message: readableApiError(
+                error,
+                "No se pudo eliminar el grupo",
+            ),
+          });
+
+          throw error;
+        }
+      },
+      [
+        authenticated,
+        refreshGroups,
+        refreshParcels,
+      ],
+  );
+
 
   return {
     groups,
     parcels,
     loading,
     notice,
+
     setNotice,
     clearNotice,
+
     refreshAll,
+
     identifyParcel,
     fieldPosition,
     lookupParcel,
+
     updateParcel,
     deleteParcel,
+
     createGroup,
     updateGroup,
     deleteGroup,

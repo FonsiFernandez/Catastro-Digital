@@ -2637,3 +2637,10 @@ svg {
     display: none;
   }
 }
+
+.empty-group-message {
+  padding: 7px 10px 9px 18px;
+  color: var(--text-muted);
+  font-size: 8.5px;
+  font-style: italic;
+}

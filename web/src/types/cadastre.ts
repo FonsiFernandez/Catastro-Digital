@@ -66,7 +66,7 @@ export type BackupParcel = {
 
 export type BackupDocument = {
   format: "catastro-digital-backup";
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   exported_at: string;
   groups: BackupGroup[];
   parcels: BackupParcel[];

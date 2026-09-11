@@ -133,17 +133,17 @@ export function ParcelList({
 
       <div className="parcel-list">
         {loading ? (
-          <div className="list-loading">
-            <span className="spinner" />
-            Cargando parcelas…
-          </div>
-        ) : parcels.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-map-icon">⌖</div>
-            <h3>Aún no hay parcelas</h3>
-            <p>Introduce una referencia catastral o selecciona una directamente desde el mapa.</p>
-          </div>
-        ) : filteredParcels.length === 0 ? (
+            <div className="list-loading">
+              <span className="spinner" />
+              Cargando parcelas…
+            </div>
+        ) : parcels.length === 0 && groups.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-map-icon">⌖</div>
+              <h3>Aún no hay parcelas</h3>
+              <p>Introduce una referencia catastral o crea un grupo para empezar.</p>
+            </div>
+        ) : filteredParcels.length === 0 && groups.length === 0 ? (
           <div className="empty-state compact">
             <h3>Sin resultados</h3>
             <p>No hay parcelas que coincidan con el filtro.</p>
@@ -151,8 +151,14 @@ export function ParcelList({
         ) : (
           groupOrder.map((groupId) => {
             const items = byGroup.get(groupId) ?? [];
-            if (!items.length) return null;
-            const group = groups.find((candidate) => candidate.id === groupId);
+
+            const group = groups.find(
+                (candidate) => candidate.id === groupId,
+            );
+
+            if (!group && !items.length) {
+              return null;
+            }
             const isCollapsed = collapsed[groupId] ?? false;
             const shownAreaHa = items
               .filter((parcel) => !parcel.properties.is_deleted)
@@ -225,31 +231,51 @@ export function ParcelList({
                 </div>
 
                 {!isCollapsed ? (
-                  <div className="group-items">
-                    {items.map((parcel) => {
-                      const props = parcel.properties;
-                      const selected = selectedRc === props.cadastral_ref;
-                      return (
-                        <button
-                          type="button"
-                          key={props.cadastral_ref}
-                          className={`parcel-row${selected ? " is-selected" : ""}${props.is_deleted ? " is-deleted" : ""}`}
-                          onClick={() => onSelect(props.cadastral_ref)}
-                        >
-                          <span
-                            className="parcel-color"
-                            style={{ background: props.color ?? DEFAULT_PARCEL_COLOR }}
-                          />
-                          <span className="parcel-main">
-                            <span className="parcel-name">{props.name?.trim() || "Sin nombre"}</span>
-                            <span className="parcel-ref">{props.cadastral_ref}</span>
-                          </span>
-                          <span className="parcel-area">{formatHectares(props.area_ha)}</span>
-                          {props.is_deleted ? <span className="deleted-badge">Borrada</span> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
+                    <div className="group-items">
+                      {items.length === 0 ? (
+                          <div className="empty-group-message">
+                            Grupo vacío
+                          </div>
+                      ) : (
+                          items.map((parcel) => {
+                            const props = parcel.properties;
+                            const selected =
+                                selectedRc === props.cadastral_ref;
+                            return (
+                                <button type="button" key={props.cadastral_ref} className={`parcel-row${selected ? " is-selected" : ""}${
+                                        props.is_deleted ? " is-deleted" : ""
+                                    }`}
+                                    onClick={() => onSelect(props.cadastral_ref)}>
+                                <span className="parcel-color" style={{
+                                      background:
+                                          props.color ?? DEFAULT_PARCEL_COLOR,
+                                    }}
+                                />
+
+                                  <span className="parcel-main">
+                                    <span className="parcel-name">
+                                      {props.name?.trim() || "Sin nombre"}
+                                    </span>
+
+                                    <span className="parcel-ref">
+                                      {props.cadastral_ref}
+                                    </span>
+                                  </span>
+
+                                  <span className="parcel-area">
+                                    {formatHectares(props.area_ha)}
+                                  </span>
+
+                                  {props.is_deleted ? (
+                                      <span className="deleted-badge">
+                                        Borrada
+                                      </span>
+                                  ) : null}
+                                </button>
+                            );
+                          })
+                      )}
+                    </div>
                 ) : null}
               </div>
             );
