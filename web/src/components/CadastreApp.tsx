@@ -385,6 +385,7 @@ export default function CadastreApp() {
             }}
             onRefresh={data.refreshAll}
             onNotice={data.setNotice}
+            onStartFieldMode={startFieldMode}
             user={auth.user}
             isGuest={auth.isGuest}
             hasGuestData={auth.hasGuestData}
