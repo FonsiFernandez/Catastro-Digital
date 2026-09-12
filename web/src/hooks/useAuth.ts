@@ -7,8 +7,9 @@ import {
 } from "react";
 
 import {
+    AUTH_SESSION_EXPIRED_EVENT,
+    ApiError,
     cadastreApi,
-    clearAuthToken,
     getAuthToken,
     setAuthToken,
     type AuthUser,
@@ -75,29 +76,89 @@ export function useAuth() {
         }, []);
 
     useEffect(() => {
+        let cancelled = false;
+
+        const switchToGuest = () => {
+            if (cancelled) {
+                return;
+            }
+
+            setUser(null);
+            setStatus("guest");
+
+            void refreshGuestDataState();
+        };
+
+        const handleSessionExpired = () => {
+            switchToGuest();
+        };
+
+        window.addEventListener(
+            AUTH_SESSION_EXPIRED_EVENT,
+            handleSessionExpired,
+        );
+
         void refreshGuestDataState();
 
         const token = getAuthToken();
 
         if (!token) {
-            setUser(null);
-            setStatus("guest");
-            return;
+            switchToGuest();
+
+            return () => {
+                cancelled = true;
+
+                window.removeEventListener(
+                    AUTH_SESSION_EXPIRED_EVENT,
+                    handleSessionExpired,
+                );
+            };
         }
 
         void cadastreApi.auth
             .me()
             .then(async (currentUser) => {
+                if (cancelled) {
+                    return;
+                }
+
                 setUser(currentUser);
                 setStatus("authenticated");
 
                 await refreshGuestDataState();
             })
-            .catch(() => {
-                clearAuthToken();
-                setUser(null);
-                setStatus("guest");
+            .catch((error: unknown) => {
+                if (cancelled) {
+                    return;
+                }
+
+                /*
+                 * A 401 is already handled centrally by api.ts, which clears
+                 * the token and emits AUTH_SESSION_EXPIRED_EVENT.
+                 */
+                if (
+                    error instanceof ApiError &&
+                    error.status === 401
+                ) {
+                    switchToGuest();
+                    return;
+                }
+
+                /*
+                 * Keep the stored session on temporary network/server errors.
+                 * We do not want a short outage to silently log the user out.
+                 */
+                setStatus("authenticated");
             });
+
+        return () => {
+            cancelled = true;
+
+            window.removeEventListener(
+                AUTH_SESSION_EXPIRED_EVENT,
+                handleSessionExpired,
+            );
+        };
     }, [refreshGuestDataState]);
 
     const login = useCallback(

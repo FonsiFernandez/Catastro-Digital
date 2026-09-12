@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   CloseIcon,
@@ -21,8 +21,6 @@ import type {
   ParcelGroup,
   ParcelUpdate,
 } from "@/types/cadastre";
-
-type LonLat = [number, number];
 
 function BackIcon() {
   return (
@@ -69,70 +67,6 @@ function AreaIcon() {
   );
 }
 
-function getPolygonRings(
-    parcel: ParcelFeature,
-): LonLat[][] {
-  if (parcel.geometry.type === "Polygon") {
-    return parcel.geometry.coordinates as LonLat[][];
-  }
-
-  if (parcel.geometry.type === "MultiPolygon") {
-    return (
-        parcel.geometry.coordinates[0] as LonLat[][]
-    );
-  }
-
-  return [];
-}
-
-function parcelPreviewPath(
-    parcel: ParcelFeature,
-): string | null {
-  const rings = getPolygonRings(parcel);
-  const ring = rings[0];
-
-  if (!ring || ring.length < 3) {
-    return null;
-  }
-
-  const xs = ring.map(([x]) => x);
-  const ys = ring.map(([, y]) => y);
-
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-
-  const width = Math.max(maxX - minX, 0.000001);
-  const height = Math.max(maxY - minY, 0.000001);
-
-  const padding = 16;
-  const viewWidth = 320;
-  const viewHeight = 150;
-
-  const scale = Math.min(
-      (viewWidth - padding * 2) / width,
-      (viewHeight - padding * 2) / height,
-  );
-
-  const offsetX =
-      (viewWidth - width * scale) / 2;
-  const offsetY =
-      (viewHeight - height * scale) / 2;
-
-  return ring
-      .map(([x, y], index) => {
-        const px =
-            offsetX + (x - minX) * scale;
-        const py =
-            viewHeight -
-            (offsetY + (y - minY) * scale);
-
-        return `${index === 0 ? "M" : "L"} ${px.toFixed(2)} ${py.toFixed(2)}`;
-      })
-      .join(" ") + " Z";
-}
-
 export function ParcelInspector({
                                   parcel,
                                   groups,
@@ -161,10 +95,6 @@ export function ParcelInspector({
   const [copied, setCopied] =
       useState(false);
 
-  const previewPath = useMemo(
-      () => parcelPreviewPath(parcel),
-      [parcel],
-  );
 
   const groupName =
       groups.find(
@@ -536,95 +466,14 @@ export function ParcelInspector({
             </button>
           </header>
 
-          <div className="mobile-parcel-preview">
-            <svg
-                viewBox="0 0 320 150"
-                role="img"
-                aria-label="Contorno de la parcela"
-            >
-              <defs>
-                <pattern
-                    id={`parcel-grid-${props.cadastral_ref}`}
-                    width="24"
-                    height="24"
-                    patternUnits="userSpaceOnUse"
-                >
-                  <path
-                      d="M24 0H0V24"
-                      fill="none"
-                      stroke="rgba(255,255,255,.18)"
-                      strokeWidth="1"
-                  />
-                </pattern>
-              </defs>
-
-              <rect
-                  width="320"
-                  height="150"
-                  fill="#7f9276"
-              />
-
-              <rect
-                  width="320"
-                  height="150"
-                  fill={`url(#parcel-grid-${props.cadastral_ref})`}
-              />
-
-              <path
-                  d="M-10 128 C55 96, 92 121, 146 91 S242 82, 330 31"
-                  fill="none"
-                  stroke="rgba(244,241,232,.7)"
-                  strokeWidth="9"
-              />
-
-              <path
-                  d="M20 16 C72 34, 105 15, 161 38 S260 49, 330 19"
-                  fill="none"
-                  stroke="rgba(64,82,62,.35)"
-                  strokeWidth="4"
-              />
-
-              {previewPath ? (
-                  <path
-                      d={previewPath}
-                      fill={
-                          props.color ??
-                          DEFAULT_PARCEL_COLOR
-                      }
-                      fillOpacity="0.65"
-                      stroke="#fffaf2"
-                      strokeWidth="5"
-                      strokeLinejoin="round"
-                  />
-              ) : null}
-
-              {previewPath ? (
-                  <path
-                      d={previewPath}
-                      fill="none"
-                      stroke={
-                          props.color ??
-                          DEFAULT_PARCEL_COLOR
-                      }
-                      strokeWidth="2"
-                      strokeLinejoin="round"
-                  />
-              ) : null}
-            </svg>
-
-            <button
-                type="button"
-                className="mobile-preview-open-map"
-                onClick={openOnMap}
-                aria-label="Ver parcela en mapa"
-            >
-              <CrosshairIcon />
-            </button>
-          </div>
+          <div
+              className="mobile-map-slot"
+              aria-label="Mapa de la parcela"
+          />
 
           <div className="mobile-detail-body">
             <div className="mobile-detail-title-row">
-              <div>
+              <div className="mobile-detail-title-copy">
                 <input
                     className="mobile-detail-name"
                     value={name}
@@ -648,6 +497,10 @@ export function ParcelInspector({
                       props.is_deleted
                     }
                 />
+
+                <span className="mobile-detail-statusline">
+                {props.is_deleted ? "Parcela archivada" : "Parcela activa"}
+              </span>
 
                 <button
                     type="button"
@@ -826,7 +679,7 @@ export function ParcelInspector({
                   onBlur={() =>
                       void saveNotes()
                   }
-                  placeholder="Añade accesos, cultivos, muros u observaciones…"
+                  placeholder="Añade accesos, cultivos, muros, caminos u observaciones…"
                   maxLength={4000}
                   disabled={
                     props.is_deleted

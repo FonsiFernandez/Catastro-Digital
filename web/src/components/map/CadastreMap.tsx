@@ -58,6 +58,7 @@ export type CadastreMapHandle = {
   fitAll: () => void;
   centerLocation: (location: DeviceLocation) => void;
   clearFieldMode: () => void;
+  resizeFor: (durationMs?: number) => void;
 };
 
 type CadastreMapProps = {
@@ -67,6 +68,7 @@ type CadastreMapProps = {
   baseMap: BaseMapId;
   previewParcel: ParcelFeature | null;
   fieldMode: boolean;
+  detailMode: boolean;
   fieldLocation: DeviceLocation | null;
   fieldTarget: FieldTarget | null;
   onSelectParcel: (cadastralRef: string) => void;
@@ -339,6 +341,7 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
           baseMap,
           previewParcel,
           fieldMode,
+          detailMode,
           fieldLocation,
           fieldTarget,
           onSelectParcel,
@@ -357,6 +360,7 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
       const baseMapRef = useRef(baseMap);
       const previewParcelRef = useRef(previewParcel);
       const fieldModeRef = useRef(fieldMode);
+      const detailModeRef = useRef(detailMode);
       const fieldLocationRef = useRef(fieldLocation);
       const fieldTargetRef = useRef(fieldTarget);
       const onSelectRef = useRef(onSelectParcel);
@@ -368,6 +372,7 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
       baseMapRef.current = baseMap;
       previewParcelRef.current = previewParcel;
       fieldModeRef.current = fieldMode;
+      detailModeRef.current = detailMode;
       fieldLocationRef.current = fieldLocation;
       fieldTargetRef.current = fieldTarget;
       onSelectRef.current = onSelectParcel;
@@ -403,6 +408,23 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
           const map = mapRef.current;
           if (!map || !mapReadyRef.current) return;
           clearFieldLayers(map);
+        },
+        resizeFor(durationMs = 460) {
+          const map = mapRef.current;
+          if (!map || !mapReadyRef.current) return;
+
+          const startedAt = performance.now();
+
+          const resizeFrame = (now: number) => {
+            map.resize();
+
+            if (now - startedAt < durationMs) {
+              window.requestAnimationFrame(resizeFrame);
+            }
+          };
+
+          map.resize();
+          window.requestAnimationFrame(resizeFrame);
         },
       }), []);
 
@@ -475,6 +497,10 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
          * already saved parcel from also launching a Catastro lookup.
          */
         map.on("click", (event: MapMouseEvent) => {
+          if (detailModeRef.current) {
+            return;
+          }
+
           const savedFeatures = map.queryRenderedFeatures(
               event.point,
               {
@@ -591,8 +617,9 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
       useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
-        map.getCanvas().style.cursor = fieldMode ? "" : "crosshair";
-      }, [fieldMode]);
+        map.getCanvas().style.cursor =
+            fieldMode || detailMode ? "" : "crosshair";
+      }, [detailMode, fieldMode]);
 
       useEffect(() => {
         const map = mapRef.current;

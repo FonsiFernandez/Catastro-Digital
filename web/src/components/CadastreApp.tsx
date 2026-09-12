@@ -8,6 +8,7 @@ import { ParcelPickerPanel } from "@/components/map/ParcelPickerPanel";
 import { Sidebar } from "@/components/sidebar/Sidebar";
 import { CrosshairIcon } from "@/components/ui/Icons";
 import { Notice } from "@/components/ui/Notice";
+import { MobileWelcome } from "@/components/MobileWelcome";
 import { useAuth } from "@/hooks/useAuth";
 import { useCadastreData } from "@/hooks/useCadastreData";
 import { useFieldLocation } from "@/hooks/useFieldLocation";
@@ -353,8 +354,38 @@ export default function CadastreApp() {
     }
   };
 
+  useEffect(() => {
+    mapRef.current?.resizeFor(480);
+
+    if (!selectedParcel || fieldMode) {
+      return;
+    }
+
+    const fitTimer = window.setTimeout(() => {
+      mapRef.current?.fitParcel(selectedParcel);
+    }, 320);
+
+    return () => {
+      window.clearTimeout(fitTimer);
+    };
+  }, [
+    fieldMode,
+    selectedParcel?.properties.cadastral_ref,
+  ]);
+
+  const appClassName = [
+    "cad-app",
+    fieldMode ? "field-mode-active" : "",
+    selectedParcel && !fieldMode
+        ? "mobile-detail-open"
+        : "",
+  ]
+      .filter(Boolean)
+      .join(" ");
+
   return (
-      <main className={fieldMode ? "cad-app field-mode-active" : "cad-app"}>
+      <main className={appClassName}>
+        <MobileWelcome />
         <Sidebar
             rcInput={rcInput}
             onRcInput={setRcInput}
@@ -405,6 +436,7 @@ export default function CadastreApp() {
               baseMap={baseMap}
               previewParcel={previewParcel}
               fieldMode={fieldMode}
+              detailMode={Boolean(selectedParcel)}
               fieldLocation={field.location}
               fieldTarget={fieldTarget}
               onSelectParcel={setSelectedRc}

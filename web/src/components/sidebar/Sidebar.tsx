@@ -28,12 +28,23 @@ import type {
 type MobileTab =
     | "home"
     | "parcels"
-    | "groups"
     | "tools"
     | "more";
 
-function HomeNavIcon() {
-    return (
+function HomeNavIcon({
+                         filled = false,
+                     }: {
+    filled?: boolean;
+}) {
+    return filled ? (
+        <svg
+            className="is-filled"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+        >
+            <path d="M3.5 10.8 12 3.3l8.5 7.5v9.1c0 .7-.6 1.3-1.3 1.3h-4.6v-6.1H9.4v6.1H4.8c-.7 0-1.3-.6-1.3-1.3Z" />
+        </svg>
+    ) : (
         <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3.5 10.5 12 3l8.5 7.5" />
             <path d="M5.5 9.5V21h13V9.5" />
@@ -42,8 +53,24 @@ function HomeNavIcon() {
     );
 }
 
-function MapNavIcon() {
-    return (
+function MapNavIcon({
+                        filled = false,
+                    }: {
+    filled?: boolean;
+}) {
+    return filled ? (
+        <svg
+            className="is-filled"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+        >
+            <path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z" />
+            <path
+                d="M9 3v15M15 6v15"
+                className="nav-icon-cut"
+            />
+        </svg>
+    ) : (
         <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z" />
             <path d="M9 3v15M15 6v15" />
@@ -59,8 +86,30 @@ function FolderNavIcon() {
     );
 }
 
-function ToolsNavIcon() {
+function FieldNavIcon() {
     return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <circle cx="12" cy="12" r="7" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+        </svg>
+    );
+}
+
+function ToolsNavIcon({
+                          filled = false,
+                      }: {
+    filled?: boolean;
+}) {
+    return filled ? (
+        <svg
+            className="is-filled"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+        >
+            <path d="M20.2 5.1a5.1 5.1 0 0 1-6.3 6.3l-6.8 6.8a2.8 2.8 0 1 1-4-4l6.8-6.8a5.1 5.1 0 0 1 6.3-6.3l-3.1 3.1.8 2.7 2.7.8Z" />
+        </svg>
+    ) : (
         <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M14.5 6.5a4 4 0 0 0 4.9 4.9L12 18.8a2.5 2.5 0 1 1-3.5-3.5l7.4-7.4a4 4 0 0 0-1.4-1.4Z" />
             <path d="m5.5 5.5 3 3" />
@@ -68,12 +117,20 @@ function ToolsNavIcon() {
     );
 }
 
-function MoreNavIcon() {
+function MoreNavIcon({
+                         filled = false,
+                     }: {
+    filled?: boolean;
+}) {
     return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="5" cy="12" r="1.2" />
-            <circle cx="12" cy="12" r="1.2" />
-            <circle cx="19" cy="12" r="1.2" />
+        <svg
+            className={filled ? "is-filled" : undefined}
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+        >
+            <circle cx="5" cy="12" r={filled ? 2.1 : 1.2} />
+            <circle cx="12" cy="12" r={filled ? 2.1 : 1.2} />
+            <circle cx="19" cy="12" r={filled ? 2.1 : 1.2} />
         </svg>
     );
 }
@@ -111,6 +168,45 @@ function DatabaseMiniIcon() {
             <ellipse cx="12" cy="5" rx="8" ry="3" />
             <path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
             <path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" />
+        </svg>
+    );
+}
+
+
+function InfoMiniIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 10v7" />
+            <path d="M12 7h.01" />
+        </svg>
+    );
+}
+
+function ShieldMiniIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3 20 6v5c0 5-3.3 8.3-8 10-4.7-1.7-8-5-8-10V6Z" />
+            <path d="m8.5 12 2.2 2.2 4.8-5" />
+        </svg>
+    );
+}
+
+function ExternalMiniIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M14 4h6v6" />
+            <path d="M20 4 11 13" />
+            <path d="M18 13v7H4V6h7" />
+        </svg>
+    );
+}
+
+function PrivacyMiniIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="5" y="10" width="14" height="10" rx="2" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
         </svg>
     );
 }
@@ -201,6 +297,11 @@ export function Sidebar({
 }) {
     const [mobileTab, setMobileTab] =
         useState<MobileTab>("home");
+
+    const [
+        mobileGroupFilterId,
+        setMobileGroupFilterId,
+    ] = useState<string | null>(null);
 
     const [homeSheetCollapsed, setHomeSheetCollapsed] =
         useState(false);
@@ -376,6 +477,76 @@ export function Sidebar({
             })),
         ];
     }, [activeParcels, groups]);
+
+    const mobileFilteredParcels =
+        useMemo(() => {
+            if (!mobileGroupFilterId) {
+                return parcels;
+            }
+
+            return parcels.filter(
+                (parcel) => {
+                    const groupId =
+                        parcel.properties.group_id;
+
+                    if (
+                        mobileGroupFilterId ===
+                        "__none__"
+                    ) {
+                        return !groupId;
+                    }
+
+                    return (
+                        groupId ===
+                        mobileGroupFilterId
+                    );
+                },
+            );
+        }, [
+            mobileGroupFilterId,
+            parcels,
+        ]);
+
+    const mobileGroupFilterName =
+        mobileGroupFilterId
+            ? groupRows.find(
+            (group) =>
+                group.id ===
+                mobileGroupFilterId,
+        )?.name ?? "Grupo"
+            : null;
+
+    const goToMobileTab = (
+        tab: MobileTab,
+    ) => {
+        if (tab === "parcels") {
+            setMobileGroupFilterId(null);
+        }
+
+        setMobileTab(tab);
+    };
+
+    const openMobileGroup = (
+        groupId: string,
+    ) => {
+        setMobileGroupFilterId(groupId);
+        setMobileTab("parcels");
+    };
+
+    const showMapFromTools = (
+        action: () => void,
+    ) => {
+        action();
+        setMobileTab("home");
+        setHomeSheetCollapsed(true);
+    };
+
+    const showSelectedParcelOnMap =
+        () => {
+            setMobileTab("home");
+            setHomeSheetCollapsed(true);
+            onCenterSelected();
+        };
 
     const createMobileGroup =
         async () => {
@@ -689,7 +860,7 @@ export function Sidebar({
                                         return;
                                     }
 
-                                    setMobileTab(
+                                    goToMobileTab(
                                         "parcels",
                                     );
                                 }}
@@ -705,7 +876,7 @@ export function Sidebar({
                                     type="button"
                                     className="mobile-summary-card"
                                     onClick={() =>
-                                        setMobileTab(
+                                        goToMobileTab(
                                             "parcels",
                                         )
                                     }
@@ -725,8 +896,8 @@ export function Sidebar({
                                     type="button"
                                     className="mobile-summary-card"
                                     onClick={() =>
-                                        setMobileTab(
-                                            "groups",
+                                        goToMobileTab(
+                                            "parcels",
                                         )
                                     }
                                 >
@@ -764,10 +935,13 @@ export function Sidebar({
                         <div className="mobile-page-head">
                             <div>
                 <span>
-                  Biblioteca
+                  {mobileGroupFilterName
+                      ? "Grupo"
+                      : "Biblioteca"}
                 </span>
                                 <h2>
-                                    Mis parcelas
+                                    {mobileGroupFilterName ??
+                                        "Mis parcelas"}
                                 </h2>
                             </div>
 
@@ -784,8 +958,32 @@ export function Sidebar({
                         </div>
 
                         <div className="mobile-page-content mobile-parcels-content">
+                            {mobileGroupFilterName ? (
+                                <div className="mobile-parcel-filter">
+                  <span>
+                    Mostrando parcelas de
+                    <strong>
+                      {mobileGroupFilterName}
+                    </strong>
+                  </span>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setMobileGroupFilterId(
+                                                null,
+                                            )
+                                        }
+                                    >
+                                        Ver todas
+                                    </button>
+                                </div>
+                            ) : null}
+
                             <ParcelList
-                                parcels={parcels}
+                                parcels={
+                                    mobileFilteredParcels
+                                }
                                 groups={groups}
                                 selectedRc={
                                     selectedRc
@@ -808,81 +1006,14 @@ export function Sidebar({
                     </section>
                 ) : null}
 
-                {mobileTab === "groups" ? (
-                    <section className="mobile-page">
-                        <div className="mobile-page-head">
-                            <div>
-                <span>
-                  Organización
-                </span>
-                                <h2>
-                                    Grupos
-                                </h2>
-                            </div>
 
-                            <button
-                                type="button"
-                                className="mobile-primary-small"
-                                onClick={() =>
-                                    void createMobileGroup()
-                                }
-                            >
-                                + Grupo
-                            </button>
-                        </div>
-
-                        <div className="mobile-page-content">
-                            <div className="mobile-group-list">
-                                {groupRows.map(
-                                    (group) => (
-                                        <button
-                                            key={group.id}
-                                            type="button"
-                                            className="mobile-group-card"
-                                            onClick={() =>
-                                                setMobileTab(
-                                                    "parcels",
-                                                )
-                                            }
-                                        >
-                      <span className="mobile-group-icon">
-                        <FolderNavIcon />
-                      </span>
-
-                                            <span className="mobile-group-copy">
-                        <strong>
-                          {group.name}
-                        </strong>
-                        <span>
-                          {group.count}{" "}
-                            {group.count ===
-                            1
-                                ? "parcela"
-                                : "parcelas"}
-                        </span>
-                      </span>
-
-                                            <span className="mobile-group-area">
-                        {formatHectares(
-                            group.areaHa,
-                        )}
-                      </span>
-
-                                            <ChevronRightIcon />
-                                        </button>
-                                    ),
-                                )}
-                            </div>
-                        </div>
-                    </section>
-                ) : null}
 
                 {mobileTab === "tools" ? (
-                    <section className="mobile-page">
+                    <section className="mobile-page mobile-tools-page">
                         <div className="mobile-page-head">
                             <div>
                 <span>
-                  Terreno
+                  Mapa y territorio
                 </span>
                                 <h2>
                                     Herramientas
@@ -893,12 +1024,10 @@ export function Sidebar({
                         <div className="mobile-page-content">
                             <button
                                 type="button"
-                                className="mobile-field-card"
-                                onClick={
-                                    onStartFieldMode
-                                }
+                                className="mobile-field-card mobile-feature-card"
+                                onClick={onStartFieldMode}
                             >
-                <span className="mobile-tool-icon">
+                <span className="mobile-tool-icon mobile-tool-icon-primary">
                   <CrosshairMiniIcon />
                 </span>
 
@@ -907,15 +1036,39 @@ export function Sidebar({
                     Modo Campo
                   </strong>
                   <small>
-                    Localízate respecto a
-                    tus parcelas con GPS.
+                    Usa el GPS para saber si estás dentro de una parcela y consultar la distancia a sus límites.
                   </small>
                 </span>
 
                                 <ChevronRightIcon />
                             </button>
 
-                            <div className="mobile-tool-grid">
+                            <div className="mobile-tools-heading">
+                                <span>Vista del mapa</span>
+                                <small>
+                                    Elige cómo quieres visualizar el terreno.
+                                </small>
+                            </div>
+
+                            <div className="mobile-tool-grid mobile-tool-grid-map">
+                                <button
+                                    type="button"
+                                    className={
+                                        baseMap === "street"
+                                            ? "mobile-tool-card is-active"
+                                            : "mobile-tool-card"
+                                    }
+                                    onClick={() =>
+                                        showMapFromTools(
+                                            () => onBaseMap("street"),
+                                        )
+                                    }
+                                >
+                                    <MapNavIcon />
+                                    <strong>Mapa</strong>
+                                    <small>Vista general</small>
+                                </button>
+
                                 <button
                                     type="button"
                                     className={
@@ -924,67 +1077,110 @@ export function Sidebar({
                                             : "mobile-tool-card"
                                     }
                                     onClick={() =>
-                                        onBaseMap(
-                                            "aerial",
+                                        showMapFromTools(
+                                            () => onBaseMap("aerial"),
                                         )
                                     }
                                 >
                                     <LayersMiniIcon />
-                                    <strong>
-                                        Ortofoto
-                                    </strong>
-                                    <small>
-                                        Fotografía aérea
-                                    </small>
+                                    <strong>Ortofoto</strong>
+                                    <small>Fotografía aérea</small>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        baseMap === "topographic"
+                                            ? "mobile-tool-card is-active"
+                                            : "mobile-tool-card"
+                                    }
+                                    onClick={() =>
+                                        showMapFromTools(
+                                            () =>
+                                                onBaseMap(
+                                                    "topographic",
+                                                ),
+                                        )
+                                    }
+                                >
+                                    <LayersMiniIcon />
+                                    <strong>Relieve</strong>
+                                    <small>Vista topográfica</small>
                                 </button>
 
                                 <button
                                     type="button"
                                     className={
                                         showCatastro
-                                            ? "mobile-tool-card is-active"
-                                            : "mobile-tool-card"
+                                            ? "mobile-tool-card is-active is-cadastre"
+                                            : "mobile-tool-card is-cadastre"
                                     }
                                     onClick={() =>
-                                        onShowCatastro(
-                                            !showCatastro,
+                                        showMapFromTools(
+                                            () =>
+                                                onShowCatastro(
+                                                    !showCatastro,
+                                                ),
                                         )
                                     }
                                 >
                                     <MapNavIcon />
-                                    <strong>
-                                        Catastro
-                                    </strong>
+                                    <strong>Catastro</strong>
                                     <small>
-                                        Límites oficiales
+                                        Límites catastrales
                                     </small>
                                 </button>
                             </div>
 
-                            <div className="mobile-tool-section">
+                            <div className="mobile-tools-heading">
+                                <span>Datos</span>
+                                <small>
+                                    Importa, exporta o crea una copia de tus parcelas y grupos.
+                                </small>
+                            </div>
+
+                            <div className="mobile-tool-section mobile-data-tools-card">
                                 <div className="mobile-tool-section-title">
                                     <DatabaseMiniIcon />
-                                    <strong>
-                                        Datos y copias
-                                    </strong>
+                                    <div>
+                                        <strong>
+                                            Importación y copias
+                                        </strong>
+                                        <small>
+                                            Backup JSON, GeoJSON e importación de datos.
+                                        </small>
+                                    </div>
                                 </div>
 
                                 <DataTools
                                     isGuest={isGuest}
-                                    onRefresh={
-                                        onRefresh
-                                    }
-                                    onNotice={
-                                        onNotice
-                                    }
+                                    onRefresh={onRefresh}
+                                    onNotice={onNotice}
                                 />
                             </div>
+
+                            <button
+                                type="button"
+                                className="mobile-simple-action"
+                                onClick={() => void onRefresh()}
+                            >
+                <span className="mobile-simple-action-icon">
+                  <RefreshIcon />
+                </span>
+                                <span>
+                  <strong>Actualizar datos</strong>
+                  <small>
+                    Vuelve a cargar parcelas, grupos y datos disponibles.
+                  </small>
+                </span>
+                                <ChevronRightIcon />
+                            </button>
                         </div>
                     </section>
                 ) : null}
 
                 {mobileTab === "more" ? (
-                    <section className="mobile-page">
+                    <section className="mobile-page mobile-more-page">
                         <div className="mobile-page-head">
                             <div>
                 <span>
@@ -997,11 +1193,15 @@ export function Sidebar({
                         </div>
 
                         <div className="mobile-page-content">
-                            <div className="mobile-account-card">
+                            <div className="mobile-account-card mobile-account-card-refined">
                                 <div className="mobile-account-copy">
+                  <span className="mobile-account-kicker">
+                    {isGuest ? "Modo invitado" : "Cuenta"}
+                  </span>
+
                                     <strong>
                                         {isGuest
-                                            ? "Estás usando Catastro Digital como invitado"
+                                            ? "Tus parcelas, en este dispositivo"
                                             : user?.display_name ??
                                             user?.email ??
                                             "Mi cuenta"}
@@ -1009,37 +1209,35 @@ export function Sidebar({
 
                                     <span>
                     {isGuest
-                        ? "Tus datos se guardan en este dispositivo."
-                        : "Tus datos están sincronizados con tu cuenta."}
+                        ? "Puedes usar Catastro Digital sin cuenta. Si inicias sesión, podrás guardar y sincronizar tus datos."
+                        : "Tus parcelas y grupos están asociados a tu cuenta."}
                   </span>
                                 </div>
 
                                 {authPanel}
                             </div>
 
-                            <label className="mobile-setting-row">
+                            <div className="mobile-tools-heading">
+                                <span>Preferencias</span>
+                            </div>
+
+                            <label className="mobile-setting-row mobile-setting-card">
                 <span>
                   <strong>
                     Mostrar borradas
                   </strong>
                   <small>
-                    Incluye parcelas del
-                    historial.
+                    Incluye las parcelas eliminadas en la biblioteca para poder restaurarlas.
                   </small>
                 </span>
 
                                 <span className="switch">
                   <input
                       type="checkbox"
-                      checked={
-                          includeDeleted
-                      }
-                      onChange={(
-                          event,
-                      ) =>
+                      checked={includeDeleted}
+                      onChange={(event) =>
                           onIncludeDeleted(
-                              event.target
-                                  .checked,
+                              event.target.checked,
                           )
                       }
                   />
@@ -1047,23 +1245,141 @@ export function Sidebar({
                 </span>
                             </label>
 
-                            <div className="mobile-tool-section">
-                                <div className="mobile-tool-section-title">
-                                    <DatabaseMiniIcon />
-                                    <strong>
-                                        Backup e importación
-                                    </strong>
-                                </div>
+                            <div className="mobile-tools-heading">
+                                <span>Sobre el proyecto</span>
+                            </div>
 
-                                <DataTools
-                                    isGuest={isGuest}
-                                    onRefresh={
-                                        onRefresh
-                                    }
-                                    onNotice={
-                                        onNotice
-                                    }
-                                />
+                            <details className="mobile-info-card" open>
+                                <summary>
+                  <span className="mobile-info-icon">
+                    <InfoMiniIcon />
+                  </span>
+                                    <span>
+                    <strong>
+                      Catastro Digital
+                    </strong>
+                    <small>
+                      Qué es y para qué sirve
+                    </small>
+                  </span>
+                                    <ChevronRightIcon />
+                                </summary>
+
+                                <div className="mobile-info-content">
+                                    <p>
+                                        Catastro Digital es una herramienta para organizar parcelas, visualizarlas sobre el mapa y trabajar con ellas desde el terreno.
+                                    </p>
+                                    <p>
+                                        El proyecto permite usar la aplicación como invitado o con cuenta, organizar fincas por grupos, consultar información catastral disponible y utilizar herramientas de localización.
+                                    </p>
+
+                                    <a
+                                        className="mobile-info-link"
+                                        href="https://github.com/FonsiFernandez/Catastro-Digital"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Ver proyecto en GitHub
+                                        <ExternalMiniIcon />
+                                    </a>
+                                </div>
+                            </details>
+
+                            <details className="mobile-info-card">
+                                <summary>
+                  <span className="mobile-info-icon">
+                    <DatabaseMiniIcon />
+                  </span>
+                                    <span>
+                    <strong>
+                      Fuentes de datos
+                    </strong>
+                    <small>
+                      Catastro, mapas y servicios externos
+                    </small>
+                  </span>
+                                    <ChevronRightIcon />
+                                </summary>
+
+                                <div className="mobile-info-content">
+                                    <p>
+                                        La información catastral mostrada por la aplicación procede de servicios públicos y externos, entre ellos los servicios INSPIRE de la Dirección General del Catastro cuando están disponibles.
+                                    </p>
+                                    <p>
+                                        Las capas de mapa, ortofoto o relieve pueden depender de proveedores externos configurados por la aplicación. Su disponibilidad, cobertura y actualización no dependen de Catastro Digital.
+                                    </p>
+                                    <p>
+                                        Los datos obtenidos de fuentes externas pueden estar temporalmente inaccesibles, incompletos, desactualizados o contener diferencias respecto a la documentación oficial vigente.
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details className="mobile-info-card mobile-info-warning">
+                                <summary>
+                  <span className="mobile-info-icon">
+                    <ShieldMiniIcon />
+                  </span>
+                                    <span>
+                    <strong>
+                      Aviso legal y limitaciones
+                    </strong>
+                    <small>
+                      Uso orientativo de los datos
+                    </small>
+                  </span>
+                                    <ChevronRightIcon />
+                                </summary>
+
+                                <div className="mobile-info-content">
+                                    <p>
+                                        Catastro Digital es una herramienta informativa y de apoyo. No sustituye certificados catastrales, escrituras, información registral, resoluciones administrativas ni documentación oficial.
+                                    </p>
+                                    <p>
+                                        Los límites, superficies, posiciones GPS y distancias mostrados son orientativos. No deben utilizarse por sí solos para deslindes, mediciones topográficas, litigios, compraventas, obras o cualquier decisión con efectos jurídicos.
+                                    </p>
+                                    <p>
+                                        Cuando una medición o límite sea relevante legalmente, debe verificarse mediante las administraciones competentes y, cuando corresponda, mediante un profesional cualificado.
+                                    </p>
+                                    <p>
+                                        Catastro Digital no controla la exactitud, continuidad o disponibilidad de los servicios y datos proporcionados por terceros.
+                                    </p>
+                                </div>
+                            </details>
+
+                            <details className="mobile-info-card">
+                                <summary>
+                  <span className="mobile-info-icon">
+                    <PrivacyMiniIcon />
+                  </span>
+                                    <span>
+                    <strong>
+                      Privacidad y almacenamiento
+                    </strong>
+                    <small>
+                      Cómo se guardan tus datos
+                    </small>
+                  </span>
+                                    <ChevronRightIcon />
+                                </summary>
+
+                                <div className="mobile-info-content">
+                                    <p>
+                                        En modo invitado, tus parcelas y grupos se almacenan localmente en este dispositivo. Si borras los datos del navegador o desinstalas la aplicación, esos datos pueden perderse.
+                                    </p>
+                                    <p>
+                                        Cuando utilizas una cuenta, los datos asociados a tu biblioteca se guardan en el servidor para poder recuperarlos y sincronizarlos.
+                                    </p>
+                                    <p>
+                                        La ubicación utilizada por Modo Campo se usa para calcular tu posición respecto a las parcelas. La interfaz debe solicitar permiso del dispositivo antes de acceder al GPS.
+                                    </p>
+                                </div>
+                            </details>
+
+                            <div className="mobile-legal-note">
+                                <ShieldMiniIcon />
+                                <span>
+                  La información mostrada es orientativa. Para cualquier uso oficial o legal, consulta siempre las fuentes y organismos competentes.
+                </span>
                             </div>
                         </div>
                     </section>
@@ -1080,7 +1396,7 @@ export function Sidebar({
                                 onCloseInspector
                             }
                             onCenter={
-                                onCenterSelected
+                                showSelectedParcelOnMap
                             }
                             onUpdate={
                                 onUpdateParcel
@@ -1104,10 +1420,10 @@ export function Sidebar({
                                 : ""
                         }
                         onClick={() =>
-                            setMobileTab("home")
+                            goToMobileTab("home")
                         }
                     >
-                        <HomeNavIcon />
+                        <HomeNavIcon filled={mobileTab === "home"} />
                         <span>Inicio</span>
                     </button>
 
@@ -1119,30 +1435,25 @@ export function Sidebar({
                                 : ""
                         }
                         onClick={() =>
-                            setMobileTab(
+                            goToMobileTab(
                                 "parcels",
                             )
                         }
                     >
-                        <MapNavIcon />
+                        <MapNavIcon filled={mobileTab === "parcels"} />
                         <span>Parcelas</span>
                     </button>
 
                     <button
                         type="button"
-                        className={
-                            mobileTab === "groups"
-                                ? "is-active"
-                                : ""
-                        }
-                        onClick={() =>
-                            setMobileTab(
-                                "groups",
-                            )
-                        }
+                        className="mobile-field-nav"
+                        onClick={onStartFieldMode}
+                        aria-label="Abrir Modo Campo"
                     >
-                        <FolderNavIcon />
-                        <span>Grupos</span>
+            <span className="mobile-field-nav-icon">
+              <FieldNavIcon />
+            </span>
+                        <span>Campo</span>
                     </button>
 
                     <button
@@ -1153,12 +1464,12 @@ export function Sidebar({
                                 : ""
                         }
                         onClick={() =>
-                            setMobileTab(
+                            goToMobileTab(
                                 "tools",
                             )
                         }
                     >
-                        <ToolsNavIcon />
+                        <ToolsNavIcon filled={mobileTab === "tools"} />
                         <span>
               Herramientas
             </span>
@@ -1172,10 +1483,10 @@ export function Sidebar({
                                 : ""
                         }
                         onClick={() =>
-                            setMobileTab("more")
+                            goToMobileTab("more")
                         }
                     >
-                        <MoreNavIcon />
+                        <MoreNavIcon filled={mobileTab === "more"} />
                         <span>Más</span>
                     </button>
                 </nav>
