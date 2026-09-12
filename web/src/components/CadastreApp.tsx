@@ -413,7 +413,7 @@ export default function CadastreApp() {
               }}
           />
 
-          <div className="map-floating-bar">
+          <div className="map-floating-bar desktop-map-floating-bar">
             <div className="map-status">
               <span className="status-dot" />
               <span>
