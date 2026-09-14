@@ -716,12 +716,12 @@ export function Sidebar({
                     <>
                         <header className="mobile-topbar">
                             <div className="mobile-brand">
-                                <div className="mobile-brand-mark">
-                                    <MapPinIcon />
-                                </div>
-                                <strong>
-                                    Catastro Digital
-                                </strong>
+                                <img
+                                    src="/onboarding/logo.png"
+                                    alt=""
+                                    className="mobile-brand-logo"
+                                />
+                                <strong>Catastro Digital</strong>
                             </div>
 
                             <div className="mobile-topbar-account">
