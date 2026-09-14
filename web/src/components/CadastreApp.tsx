@@ -58,6 +58,8 @@ export default function CadastreApp() {
   const identifyRequestIdRef = useRef(0);
   const fieldRequestIdRef = useRef(0);
   const centeredFirstFieldFixRef = useRef(false);
+  const fieldBaseMapRef = useRef<BaseMapId | null>(null);
+  const fieldShowCatastroRef = useRef<boolean | null>(null);
 
   const [rcInput, setRcInput] = useState("");
   const [selectedRc, setSelectedRc] = useState<string | null>(null);
@@ -199,6 +201,9 @@ export default function CadastreApp() {
     setFieldTarget(null);
     setFieldDataError(null);
     centeredFirstFieldFixRef.current = false;
+
+    fieldBaseMapRef.current = null;
+    fieldShowCatastroRef.current = null;
   };
 
   const startFieldMode = () => {
@@ -207,20 +212,55 @@ export default function CadastreApp() {
     setPreviewParcel(null);
     setPreviewAlreadySaved(false);
 
+    /*
+     * Remember the exact map configuration active on Home.
+     * Field Mode must preserve it exactly.
+     */
+    fieldBaseMapRef.current = baseMap;
+    fieldShowCatastroRef.current = showCatastro;
+
     setFieldMode(true);
     setFieldTarget(null);
     setFieldDataError(null);
     centeredFirstFieldFixRef.current = false;
 
-    setShowCatastro(true);
-
-    if (baseMap === "street") {
-      setBaseMap("aerial");
-    }
-
     field.start();
     data.clearNotice();
   };
+
+  useEffect(() => {
+    if (!fieldMode) {
+      return;
+    }
+
+    const expectedBaseMap =
+        fieldBaseMapRef.current;
+
+    const expectedShowCatastro =
+        fieldShowCatastroRef.current;
+
+    if (
+        expectedBaseMap &&
+        baseMap !== expectedBaseMap
+    ) {
+      setBaseMap(expectedBaseMap);
+    }
+
+    if (
+        expectedShowCatastro != null &&
+        showCatastro !== expectedShowCatastro
+    ) {
+      setShowCatastro(
+          expectedShowCatastro,
+      );
+    }
+  }, [
+    baseMap,
+    fieldMode,
+    showCatastro,
+    setBaseMap,
+    setShowCatastro,
+  ]);
 
   const cancelIdentify = () => {
     if (savingPreview) return;
@@ -417,6 +457,7 @@ export default function CadastreApp() {
             onRefresh={data.refreshAll}
             onNotice={data.setNotice}
             onStartFieldMode={startFieldMode}
+            onStopFieldMode={stopFieldMode}
             user={auth.user}
             isGuest={auth.isGuest}
             hasGuestData={auth.hasGuestData}

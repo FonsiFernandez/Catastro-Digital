@@ -107,12 +107,13 @@ function ToolsNavIcon({
             viewBox="0 0 24 24"
             aria-hidden="true"
         >
-            <path d="M20.2 5.1a5.1 5.1 0 0 1-6.3 6.3l-6.8 6.8a2.8 2.8 0 1 1-4-4l6.8-6.8a5.1 5.1 0 0 1 6.3-6.3l-3.1 3.1.8 2.7 2.7.8Z" />
+            <path d="M20.6 5.6a5.4 5.4 0 0 1-6.9 6.6l-6.3 6.3a2.8 2.8 0 1 1-3.9-3.9l6.3-6.3a5.4 5.4 0 0 1 6.6-6.9l-3.2 3.2.8 2.7 2.7.8Z" />
+            <circle cx="5.5" cy="16.5" r="1.05" className="tool-icon-hole" />
         </svg>
     ) : (
         <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M14.5 6.5a4 4 0 0 0 4.9 4.9L12 18.8a2.5 2.5 0 1 1-3.5-3.5l7.4-7.4a4 4 0 0 0-1.4-1.4Z" />
-            <path d="m5.5 5.5 3 3" />
+            <path d="M20.6 5.6a5.4 5.4 0 0 1-6.9 6.6l-6.3 6.3a2.8 2.8 0 1 1-3.9-3.9l6.3-6.3a5.4 5.4 0 0 1 6.6-6.9l-3.2 3.2.8 2.7 2.7.8Z" />
+            <circle cx="5.5" cy="16.5" r="1.05" />
         </svg>
     );
 }
@@ -158,6 +159,49 @@ function LayersMiniIcon() {
             <path d="m12 3 9 5-9 5-9-5Z" />
             <path d="m3 12 9 5 9-5" />
             <path d="m3 16 9 5 9-5" />
+        </svg>
+    );
+}
+
+
+function ParcelSummaryIcon() {
+    return (
+        <svg
+            className="summary-filled-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+        >
+            <path d="m3 6.2 5.8-2.8 6.2 2.8 6-2.8v14.4L15 21l-6.2-2.8L3 21Z" />
+            <path
+                className="summary-icon-cut"
+                d="M8.8 3.4v14.8M15 6.2V21"
+            />
+        </svg>
+    );
+}
+
+function GroupSummaryIcon() {
+    return (
+        <svg
+            className="summary-filled-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+        >
+            <path d="M3 7.1c0-.9.7-1.6 1.6-1.6h5.1l1.9 2H19.4c.9 0 1.6.7 1.6 1.6v9.3c0 .9-.7 1.6-1.6 1.6H4.6C3.7 20 3 19.3 3 18.4Z" />
+        </svg>
+    );
+}
+
+function AreaSummaryIcon() {
+    return (
+        <svg
+            className="summary-filled-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+        >
+            <path d="m12 2.5 8.7 4.8L12 12.1 3.3 7.3Z" />
+            <path d="m3.3 11.2 8.7 4.8 8.7-4.8v4.1L12 20.1l-8.7-4.8Z" />
+            <path d="m3.3 16.1 8.7 4.8 8.7-4.8v2.6L12 23.5l-8.7-4.8Z" opacity=".72" />
         </svg>
     );
 }
@@ -238,6 +282,7 @@ export function Sidebar({
                             onRefresh,
                             onNotice,
                             onStartFieldMode,
+                            onStopFieldMode,
                             user,
                             isGuest,
                             hasGuestData,
@@ -262,7 +307,7 @@ export function Sidebar({
     selectedRc: string | null;
     selectedParcel: ParcelFeature | null;
     loading: boolean;
-    onSelectParcel: (rc: string) => void;
+    onSelectParcel: (rc: string | null) => void;
     onCreateGroup: (name: string) => Promise<unknown>;
     onUpdateGroup: (id: string, update: GroupUpdate) => Promise<unknown>;
     onDeleteGroup: (id: string) => Promise<unknown>;
@@ -273,6 +318,7 @@ export function Sidebar({
     onRefresh: () => Promise<unknown>;
     onNotice: (notice: NoticeState) => void;
     onStartFieldMode: () => void;
+    onStopFieldMode: () => void;
     user: AuthUser | null;
     isGuest: boolean;
     hasGuestData: boolean;
@@ -519,6 +565,13 @@ export function Sidebar({
     const goToMobileTab = (
         tab: MobileTab,
     ) => {
+        /*
+         * If the user is currently in Modo Campo, navigation means leaving
+         * that mode first. Otherwise the field overlay remains active and
+         * visually masks the destination tab.
+         */
+        onStopFieldMode();
+
         if (tab === "parcels") {
             setMobileGroupFilterId(null);
         }
@@ -589,8 +642,12 @@ export function Sidebar({
             <div className="sidebar-desktop">
                 <header className="sidebar-header">
                     <div className="brand">
-                        <div className="brand-mark">
-                            <MapPinIcon />
+                        <div className="brand-mark brand-mark-logo">
+                            <img
+                                src="/onboarding/logo.png"
+                                alt=""
+                                className="brand-logo-image"
+                            />
                         </div>
 
                         <div>
@@ -714,96 +771,102 @@ export function Sidebar({
             <div className="sidebar-mobile">
                 {mobileTab === "home" ? (
                     <>
-                        <header className="mobile-topbar">
-                            <div className="mobile-brand">
-                                <img
-                                    src="/onboarding/logo.png"
-                                    alt=""
-                                    className="mobile-brand-logo"
+                        <div className="mobile-home-top-panel">
+                            <header className="mobile-topbar">
+                                <div className="mobile-brand">
+                                    <div className="mobile-brand-mark mobile-brand-mark-logo">
+                                        <img
+                                            src="/onboarding/logo.png"
+                                            alt=""
+                                            className="mobile-brand-logo"
+                                        />
+                                    </div>
+                                    <strong>
+                                        Catastro Digital
+                                    </strong>
+                                </div>
+
+                                <div className="mobile-topbar-account">
+                                    {authPanel}
+                                </div>
+                            </header>
+
+                            <section className="mobile-search">
+                                <SearchBar
+                                    value={rcInput}
+                                    onChange={onRcInput}
+                                    onSubmit={onSearch}
+                                    isSearching={
+                                        isSearching
+                                    }
                                 />
-                                <strong>Catastro Digital</strong>
+                            </section>
+
+                            <div
+                                className="mobile-map-chips"
+                                aria-label="Vista del mapa"
+                            >
+                                <button
+                                    type="button"
+                                    className={
+                                        baseMap === "street"
+                                            ? "is-active"
+                                            : ""
+                                    }
+                                    onClick={() =>
+                                        onBaseMap("street")
+                                    }
+                                >
+                                    Mapa
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        baseMap === "aerial"
+                                            ? "is-active"
+                                            : ""
+                                    }
+                                    onClick={() =>
+                                        onBaseMap("aerial")
+                                    }
+                                >
+                                    Ortofoto
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        showCatastro
+                                            ? "is-active"
+                                            : ""
+                                    }
+                                    onClick={() =>
+                                        onShowCatastro(
+                                            !showCatastro,
+                                        )
+                                    }
+                                >
+                                    Catastro
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        baseMap ===
+                                        "topographic"
+                                            ? "is-active"
+                                            : ""
+                                    }
+                                    onClick={() =>
+                                        onBaseMap(
+                                            "topographic",
+                                        )
+                                    }
+                                >
+                                    Relieve
+                                </button>
                             </div>
-
-                            <div className="mobile-topbar-account">
-                                {authPanel}
-                            </div>
-                        </header>
-
-                        <section className="mobile-search">
-                            <SearchBar
-                                value={rcInput}
-                                onChange={onRcInput}
-                                onSubmit={onSearch}
-                                isSearching={
-                                    isSearching
-                                }
-                            />
-                        </section>
-
-                        <div
-                            className="mobile-map-chips"
-                            aria-label="Vista del mapa"
-                        >
-                            <button
-                                type="button"
-                                className={
-                                    baseMap === "street"
-                                        ? "is-active"
-                                        : ""
-                                }
-                                onClick={() =>
-                                    onBaseMap("street")
-                                }
-                            >
-                                Mapa
-                            </button>
-
-                            <button
-                                type="button"
-                                className={
-                                    baseMap === "aerial"
-                                        ? "is-active"
-                                        : ""
-                                }
-                                onClick={() =>
-                                    onBaseMap("aerial")
-                                }
-                            >
-                                Ortofoto
-                            </button>
-
-                            <button
-                                type="button"
-                                className={
-                                    showCatastro
-                                        ? "is-active"
-                                        : ""
-                                }
-                                onClick={() =>
-                                    onShowCatastro(
-                                        !showCatastro,
-                                    )
-                                }
-                            >
-                                Catastro
-                            </button>
-
-                            <button
-                                type="button"
-                                className={
-                                    baseMap ===
-                                    "topographic"
-                                        ? "is-active"
-                                        : ""
-                                }
-                                onClick={() =>
-                                    onBaseMap(
-                                        "topographic",
-                                    )
-                                }
-                            >
-                                Relieve
-                            </button>
                         </div>
 
                         <section
@@ -882,7 +945,7 @@ export function Sidebar({
                                     }
                                 >
                   <span className="mobile-summary-icon">
-                    <MapNavIcon />
+                    <ParcelSummaryIcon />
                   </span>
                                     <strong>
                                         {activeCount}
@@ -902,7 +965,7 @@ export function Sidebar({
                                     }
                                 >
                   <span className="mobile-summary-icon">
-                    <FolderNavIcon />
+                    <GroupSummaryIcon />
                   </span>
                                     <strong>
                                         {groups.length}
@@ -914,7 +977,7 @@ export function Sidebar({
 
                                 <div className="mobile-summary-card">
                   <span className="mobile-summary-icon">
-                    <LayersMiniIcon />
+                    <AreaSummaryIcon />
                   </span>
                                     <strong>
                                         {formatHectares(
@@ -1013,7 +1076,7 @@ export function Sidebar({
                         <div className="mobile-page-head">
                             <div>
                 <span>
-                  Mapa y territorio
+                  DATOS Y COPIAS
                 </span>
                                 <h2>
                                     Herramientas
@@ -1022,133 +1085,64 @@ export function Sidebar({
                         </div>
 
                         <div className="mobile-page-content">
-                            <button
-                                type="button"
-                                className="mobile-field-card mobile-feature-card"
-                                onClick={onStartFieldMode}
-                            >
-                <span className="mobile-tool-icon mobile-tool-icon-primary">
-                  <CrosshairMiniIcon />
-                </span>
+                            <section className="mobile-tools-hero">
+                                <div className="mobile-tools-hero-icon">
+                                    <DatabaseMiniIcon />
+                                </div>
 
-                                <span>
-                  <strong>
-                    Modo Campo
-                  </strong>
-                  <small>
-                    Usa el GPS para saber si estás dentro de una parcela y consultar la distancia a sus límites.
-                  </small>
-                </span>
+                                <div className="mobile-tools-hero-copy">
+                  <span className="mobile-tools-hero-kicker">
+                    Tus datos
+                  </span>
 
-                                <ChevronRightIcon />
-                            </button>
+                                    <strong>
+                                        Tú tienes el control
+                                    </strong>
+
+                                    <p>
+                                        Crea copias de seguridad, exporta tus parcelas
+                                        o restaura tus datos cuando lo necesites.
+                                    </p>
+                                </div>
+
+                                <span className="mobile-tools-storage-badge">
+                  {isGuest ? "En este dispositivo" : "Cuenta sincronizada"}
+                </span>
+                            </section>
 
                             <div className="mobile-tools-heading">
-                                <span>Vista del mapa</span>
+                <span>
+                  Importar y exportar
+                </span>
                                 <small>
-                                    Elige cómo quieres visualizar el terreno.
-                                </small>
-                            </div>
-
-                            <div className="mobile-tool-grid mobile-tool-grid-map">
-                                <button
-                                    type="button"
-                                    className={
-                                        baseMap === "street"
-                                            ? "mobile-tool-card is-active"
-                                            : "mobile-tool-card"
-                                    }
-                                    onClick={() =>
-                                        showMapFromTools(
-                                            () => onBaseMap("street"),
-                                        )
-                                    }
-                                >
-                                    <MapNavIcon />
-                                    <strong>Mapa</strong>
-                                    <small>Vista general</small>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    className={
-                                        baseMap === "aerial"
-                                            ? "mobile-tool-card is-active"
-                                            : "mobile-tool-card"
-                                    }
-                                    onClick={() =>
-                                        showMapFromTools(
-                                            () => onBaseMap("aerial"),
-                                        )
-                                    }
-                                >
-                                    <LayersMiniIcon />
-                                    <strong>Ortofoto</strong>
-                                    <small>Fotografía aérea</small>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    className={
-                                        baseMap === "topographic"
-                                            ? "mobile-tool-card is-active"
-                                            : "mobile-tool-card"
-                                    }
-                                    onClick={() =>
-                                        showMapFromTools(
-                                            () =>
-                                                onBaseMap(
-                                                    "topographic",
-                                                ),
-                                        )
-                                    }
-                                >
-                                    <LayersMiniIcon />
-                                    <strong>Relieve</strong>
-                                    <small>Vista topográfica</small>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    className={
-                                        showCatastro
-                                            ? "mobile-tool-card is-active is-cadastre"
-                                            : "mobile-tool-card is-cadastre"
-                                    }
-                                    onClick={() =>
-                                        showMapFromTools(
-                                            () =>
-                                                onShowCatastro(
-                                                    !showCatastro,
-                                                ),
-                                        )
-                                    }
-                                >
-                                    <MapNavIcon />
-                                    <strong>Catastro</strong>
-                                    <small>
-                                        Límites catastrales
-                                    </small>
-                                </button>
-                            </div>
-
-                            <div className="mobile-tools-heading">
-                                <span>Datos</span>
-                                <small>
-                                    Importa, exporta o crea una copia de tus parcelas y grupos.
+                                    Copias completas y formatos reutilizables de tus parcelas y grupos.
                                 </small>
                             </div>
 
                             <div className="mobile-tool-section mobile-data-tools-card">
-                                <div className="mobile-tool-section-title">
-                                    <DatabaseMiniIcon />
-                                    <div>
-                                        <strong>
-                                            Importación y copias
-                                        </strong>
-                                        <small>
-                                            Backup JSON, GeoJSON e importación de datos.
-                                        </small>
+                                <div className="mobile-data-tools-intro">
+                                    <div className="mobile-data-tool-feature">
+                    <span className="mobile-data-feature-icon is-green">
+                      <ShieldMiniIcon />
+                    </span>
+                                        <div>
+                                            <strong>Copia de seguridad</strong>
+                                            <small>
+                                                Guarda una copia JSON que podrás restaurar más adelante.
+                                            </small>
+                                        </div>
+                                    </div>
+
+                                    <div className="mobile-data-tool-feature">
+                    <span className="mobile-data-feature-icon is-amber">
+                      <MapNavIcon />
+                    </span>
+                                        <div>
+                                            <strong>GeoJSON</strong>
+                                            <small>
+                                                Exporta las geometrías para utilizarlas en otras herramientas GIS.
+                                            </small>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1159,22 +1153,43 @@ export function Sidebar({
                                 />
                             </div>
 
+                            <div className="mobile-tools-heading">
+                <span>
+                  Actualización
+                </span>
+                                <small>
+                                    Recarga la biblioteca y comprueba los últimos datos disponibles.
+                                </small>
+                            </div>
+
                             <button
                                 type="button"
-                                className="mobile-simple-action"
+                                className="mobile-simple-action mobile-refresh-data-action"
                                 onClick={() => void onRefresh()}
                             >
                 <span className="mobile-simple-action-icon">
                   <RefreshIcon />
                 </span>
+
                                 <span>
-                  <strong>Actualizar datos</strong>
+                  <strong>
+                    Actualizar datos
+                  </strong>
                   <small>
                     Vuelve a cargar parcelas, grupos y datos disponibles.
                   </small>
                 </span>
+
                                 <ChevronRightIcon />
                             </button>
+
+                            <div className="mobile-tools-note">
+                                <InfoMiniIcon />
+                                <span>
+                  Las capas de mapa y Catastro se gestionan directamente
+                  desde Inicio. Modo Campo tiene su propio acceso en la barra inferior.
+                </span>
+                            </div>
                         </div>
                     </section>
                 ) : null}

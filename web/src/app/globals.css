@@ -7528,9 +7528,1500 @@ max-height: 760px
   .welcome-footer { padding-top: 7px; }
 }
 
-.mobile-brand-logo {
-  width: 42px;
-  height: 42px;
-  object-fit: contain;
-  flex: 0 0 42px;
+
+/* ==========================================================================
+   MOBILE UI — mockup fidelity / readability / persistent navigation
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /* ----------------------------------------------------------------------
+     Global mobile readability
+     ---------------------------------------------------------------------- */
+
+  .sidebar-mobile,
+  .parcel-detail-mobile,
+  .field-mobile-shell {
+    --mock-text: #162b22;
+    --mock-muted: #66736c;
+    --mock-green: #365f4b;
+    --mock-green-soft: #eaf2ed;
+    --mock-terracotta: #b66d4f;
+    --mock-amber: #d89b35;
+  }
+
+  .sidebar-mobile {
+    color: var(--mock-text);
+  }
+
+  .mobile-page-head h2,
+  .mobile-sheet-title strong,
+  .mobile-detail-name,
+  .field-mobile-header strong {
+    color: var(--mock-text);
+  }
+
+  .mobile-page-head h2 {
+    font-size: 22px;
+    font-weight: 820;
+    line-height: 1.05;
+    letter-spacing: -0.045em;
+  }
+
+  .mobile-page-head > div > span,
+  .mobile-tools-heading > span,
+  .mobile-account-kicker {
+    font-size: 9px;
+    font-weight: 780;
+  }
+
+  .mobile-page-content,
+  .mobile-info-content,
+  .mobile-setting-card small,
+  .mobile-tool-card small,
+  .mobile-simple-action small,
+  .mobile-account-card-refined .mobile-account-copy > span:last-child {
+    color: var(--mock-muted);
+  }
+
+  /* ----------------------------------------------------------------------
+     Official brand logo
+     ---------------------------------------------------------------------- */
+
+  .mobile-brand-mark-logo {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+
+    padding: 4px;
+    border-radius: 12px;
+
+    background: transparent;
+  }
+
+  .mobile-brand-logo {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+  }
+
+  .mobile-brand strong {
+    font-size: 18px;
+    font-weight: 820;
+    letter-spacing: -0.045em;
+  }
+
+  /* ----------------------------------------------------------------------
+     One unified white top panel, like the mockup
+     ---------------------------------------------------------------------- */
+
+  .mobile-home-top-panel {
+    position: absolute;
+    z-index: 58;
+
+    top: max(8px, env(safe-area-inset-top));
+    left: 10px;
+    right: 10px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+
+    padding: 9px;
+
+    border: 1px solid rgba(35, 53, 43, 0.08);
+    border-radius: 21px;
+
+    background: rgba(255, 253, 248, 0.985);
+
+    box-shadow:
+            0 10px 30px
+            rgba(20, 35, 27, 0.13);
+
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+  }
+
+  .mobile-home-top-panel .mobile-topbar,
+  .mobile-home-top-panel .mobile-search,
+  .mobile-home-top-panel .mobile-map-chips {
+    position: static !important;
+
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+
+    width: 100%;
+    margin: 0;
+
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .mobile-home-top-panel .mobile-topbar {
+    height: 50px;
+
+    padding: 2px 3px 2px 5px;
+
+    border: 0;
+    border-radius: 14px;
+
+    background: transparent;
+  }
+
+  .mobile-home-top-panel .mobile-search .search-box {
+    min-height: 50px;
+
+    padding: 5px 5px 5px 13px;
+
+    border: 1px solid rgba(35, 53, 43, 0.08);
+    border-radius: 15px;
+
+    background: #f8f8f3;
+  }
+
+  .mobile-home-top-panel .mobile-search .search-box input {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .mobile-home-top-panel .mobile-search .search-box .primary-button {
+    min-height: 40px;
+    padding: 0 16px;
+
+    border-radius: 12px;
+
+    font-size: 11px;
+    font-weight: 760;
+  }
+
+  .mobile-home-top-panel .mobile-map-chips {
+    gap: 5px;
+
+    padding: 4px;
+
+    border: 0;
+    border-radius: 14px;
+
+    background: #f7f6f1;
+  }
+
+  .mobile-home-top-panel .mobile-map-chips button {
+    height: 38px;
+
+    border-radius: 11px;
+
+    color: #4f5f57;
+
+    font-size: 10.5px;
+    font-weight: 720;
+  }
+
+  .mobile-home-top-panel .mobile-map-chips button.is-active {
+    color: white;
+    background: var(--mock-green);
+  }
+
+  .mobile-home-top-panel .mobile-map-chips button:nth-child(3).is-active {
+    color: #7f432e;
+    background: #f4e4dc;
+    border-color: #e4b8a5;
+  }
+
+  /* ----------------------------------------------------------------------
+     Profile button: real circular profile treatment
+     ---------------------------------------------------------------------- */
+
+  .mobile-topbar-account .guest-account-button,
+  .mobile-topbar-account .account-pill {
+    width: 42px;
+    height: 42px;
+
+    display: grid;
+    place-items: center;
+
+    padding: 4px;
+
+    border: 0;
+    border-radius: 50%;
+
+    color: #fff;
+    background: var(--mock-green);
+  }
+
+  .mobile-topbar-account .account-avatar {
+    width: 34px;
+    height: 34px;
+
+    display: grid;
+    place-items: center;
+
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    border-radius: 50%;
+
+    color: white;
+    background: var(--mock-green);
+
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .mobile-topbar-account .guest-dot {
+    width: 14px;
+    height: 14px;
+
+    border: 3px solid rgba(255, 255, 255, 0.92);
+    border-radius: 50%;
+
+    background: var(--mock-amber);
+  }
+
+  /* Keep map controls below the complete white header block */
+  .sidebar-mobile:has(.mobile-home-top-panel)
+  ~ * .maplibregl-ctrl-top-right,
+  .cad-app:not(.mobile-detail-open):not(.field-mode-active)
+  .maplibregl-ctrl-top-right {
+    top: 208px;
+  }
+
+  /* ----------------------------------------------------------------------
+     Mis parcelas: larger, more legible, more colorful
+     ---------------------------------------------------------------------- */
+
+  .mobile-home-sheet {
+    padding: 10px 14px 14px;
+
+    border-radius: 22px 22px 0 0;
+  }
+
+  .mobile-sheet-title {
+    padding-bottom: 9px;
+  }
+
+  .mobile-sheet-title strong {
+    font-size: 16px;
+    font-weight: 820;
+  }
+
+  .mobile-summary-grid {
+    gap: 8px;
+  }
+
+  .mobile-summary-card {
+    min-height: 112px;
+
+    gap: 4px;
+
+    padding: 11px 10px;
+
+    border-color: rgba(35, 53, 43, 0.08);
+    border-radius: 16px;
+
+    background: #fffdf8;
+  }
+
+  .mobile-summary-icon {
+    width: 34px;
+    height: 34px;
+
+    margin-bottom: 5px;
+
+    border-radius: 11px;
+  }
+
+  .mobile-summary-card:nth-child(1) .mobile-summary-icon {
+    color: #376c5a;
+    background: #e8f2ed;
+  }
+
+  .mobile-summary-card:nth-child(2) .mobile-summary-icon {
+    color: #b07a27;
+    background: #f6eddc;
+  }
+
+  .mobile-summary-card:nth-child(3) .mobile-summary-icon {
+    color: #657b5f;
+    background: #e9efe5;
+  }
+
+  .mobile-summary-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .mobile-summary-card strong {
+    color: #152a21;
+
+    font-size: 18px;
+    font-weight: 830;
+  }
+
+  .mobile-summary-card > span:last-child {
+    color: #637169;
+
+    font-size: 9.5px;
+    font-weight: 520;
+    line-height: 1.25;
+  }
+
+  /* ----------------------------------------------------------------------
+     Bottom navigation: always visible on every in-app mobile screen
+     ---------------------------------------------------------------------- */
+
+  .mobile-bottom-nav,
+  .mobile-inspector-layer + .mobile-bottom-nav,
+  .mobile-detail-open .mobile-bottom-nav,
+  .field-mode-active .mobile-bottom-nav {
+    position: fixed !important;
+    z-index: 1600 !important;
+
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    display: grid !important;
+
+    height:
+            calc(
+                    var(--mobile-nav-height) +
+                    env(safe-area-inset-bottom)
+            );
+
+    padding:
+            8px
+            5px
+            env(safe-area-inset-bottom);
+
+    border-top:
+            1px solid rgba(35, 53, 43, 0.08);
+
+    background:
+            rgba(255, 253, 248, 0.985);
+
+    box-shadow:
+            0 -8px 24px
+            rgba(20, 35, 27, 0.07);
+
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .mobile-bottom-nav button,
+  .mobile-bottom-nav .mobile-field-nav {
+    align-self: flex-start;
+
+    min-height: 52px;
+
+    gap: 4px;
+
+    padding: 3px 2px 0;
+
+    color: #657169;
+  }
+
+  .mobile-bottom-nav button svg,
+  .mobile-bottom-nav
+  .mobile-field-nav
+  .mobile-field-nav-icon
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .mobile-bottom-nav button > span:last-child,
+  .mobile-bottom-nav
+  .mobile-field-nav
+  > span:last-child {
+    font-size: 8.5px;
+    font-weight: 650;
+  }
+
+  .mobile-bottom-nav button.is-active {
+    color: var(--mock-green);
+  }
+
+  .mobile-bottom-nav button.is-active > span:last-child {
+    font-weight: 820;
+  }
+
+  .mobile-bottom-nav .mobile-field-nav {
+    color: var(--mock-terracotta);
+  }
+
+  .mobile-bottom-nav
+  .mobile-field-nav
+  > span:last-child {
+    color: var(--mock-terracotta);
+    font-weight: 800;
+  }
+
+  .mobile-bottom-nav
+  svg.is-filled
+  .tool-icon-hole {
+    fill: var(--mobile-card);
+    stroke: var(--mobile-card);
+  }
+
+  /* Reserve nav space on all scrollable mobile screens */
+  .mobile-page-content,
+  .mobile-detail-body {
+    padding-bottom:
+            calc(
+                    var(--mobile-nav-height) +
+                    env(safe-area-inset-bottom) +
+                    20px
+            ) !important;
+  }
+
+  .mobile-detail-actions {
+    bottom:
+            calc(
+                    var(--mobile-nav-height) +
+                    env(safe-area-inset-bottom) +
+                    4px
+            );
+  }
+
+  /* Field mode keeps only the persistent nav from the sidebar */
+  .field-mode-active .cad-sidebar {
+    display: block !important;
+    pointer-events: none;
+  }
+
+  .field-mode-active .sidebar-mobile {
+    display: block !important;
+  }
+
+  .field-mode-active
+  .sidebar-mobile
+  > :not(.mobile-bottom-nav) {
+    display: none !important;
+  }
+
+  .field-mode-active .mobile-bottom-nav {
+    pointer-events: auto;
+  }
+
+  .field-mobile-content {
+    bottom:
+            calc(
+                    var(--mobile-nav-height) +
+                    env(safe-area-inset-bottom) +
+                    10px
+            ) !important;
+  }
+
+  /* ----------------------------------------------------------------------
+     General card/button refinement across existing screens
+     ---------------------------------------------------------------------- */
+
+  .mobile-tool-card,
+  .mobile-simple-action,
+  .mobile-setting-card,
+  .mobile-info-card,
+  .mobile-account-card-refined,
+  .mobile-detail-metrics > div,
+  .mobile-detail-notes,
+  .field-mobile-gps-card,
+  .field-mobile-target-card,
+  .field-mobile-distance {
+    border-color: rgba(35, 53, 43, 0.08);
+    background: #fffdf8;
+  }
+
+  .mobile-tool-card strong,
+  .mobile-simple-action strong,
+  .mobile-info-card > summary strong,
+  .mobile-setting-card strong,
+  .mobile-notes-copy > strong,
+  .field-mobile-target-copy strong {
+    color: var(--mock-text);
+
+    font-size: 10.5px;
+    font-weight: 760;
+  }
+
+  .mobile-tool-card small,
+  .mobile-simple-action small,
+  .mobile-info-card > summary small,
+  .mobile-setting-card small,
+  .field-mobile-target-copy small {
+    font-size: 8.5px;
+    line-height: 1.4;
+  }
+
+  .mobile-detail-metrics strong {
+    font-size: 16px;
+  }
+
+  .mobile-detail-ref code,
+  .parcel-browser-responsive .parcel-ref {
+    font-size: 8.5px;
+  }
+
+  .field-mobile-distance > strong {
+    font-size: 30px;
+  }
+}
+
+/* Desktop brand can also use the official logo resource */
+@media (min-width: 721px) {
+  .brand-mark-logo {
+    background: transparent;
+  }
+
+  .brand-logo-image {
+    width: 38px;
+    height: 38px;
+    display: block;
+    object-fit: contain;
+  }
+}
+
+
+/* ==========================================================================
+   MOBILE UI — refinement corrections
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /* ----------------------------------------------------------------------
+     Home header: back to three separate white surfaces, not one big box.
+     Keep the improved typography from the previous pass.
+     ---------------------------------------------------------------------- */
+
+  .mobile-home-top-panel {
+    top: max(8px, env(safe-area-inset-top));
+    left: 10px;
+    right: 10px;
+
+    gap: 9px;
+
+    padding: 0;
+
+    border: 0;
+    border-radius: 0;
+
+    background: transparent;
+
+    box-shadow: none;
+
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .mobile-home-top-panel .mobile-topbar {
+    height: 54px;
+
+    padding: 5px 7px;
+
+    border: 1px solid rgba(35, 53, 43, 0.08);
+    border-radius: 18px;
+
+    background: rgba(255, 253, 248, 0.985);
+
+    box-shadow:
+            0 7px 22px
+            rgba(20, 35, 27, 0.10);
+  }
+
+  .mobile-home-top-panel .mobile-search {
+    border-radius: 17px;
+
+    background: rgba(255, 253, 248, 0.985);
+
+    box-shadow:
+            0 7px 22px
+            rgba(20, 35, 27, 0.09);
+  }
+
+  .mobile-home-top-panel .mobile-search .search-box {
+    min-height: 52px;
+
+    border: 1px solid rgba(35, 53, 43, 0.07);
+    border-radius: 17px;
+
+    background: rgba(255, 253, 248, 0.985);
+  }
+
+  .mobile-home-top-panel .mobile-map-chips {
+    min-height: 48px;
+
+    padding: 5px;
+
+    border: 1px solid rgba(35, 53, 43, 0.07);
+    border-radius: 17px;
+
+    background: rgba(255, 253, 248, 0.985);
+
+    box-shadow:
+            0 7px 22px
+            rgba(20, 35, 27, 0.09);
+  }
+
+  /* ----------------------------------------------------------------------
+     Filled, colorful "Mis parcelas" icons — matching the mockup language.
+     ---------------------------------------------------------------------- */
+
+  .mobile-summary-icon .summary-filled-icon {
+    width: 20px;
+    height: 20px;
+
+    fill: currentColor;
+    stroke: none;
+  }
+
+  .mobile-summary-icon .summary-icon-cut {
+    fill: none;
+    stroke: #fffdf8;
+    stroke-width: 1.55;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .mobile-summary-card:nth-child(1) .mobile-summary-icon {
+    color: #4b7c68;
+    background: #e8f1ec;
+  }
+
+  .mobile-summary-card:nth-child(2) .mobile-summary-icon {
+    color: #d19737;
+    background: #f8edd9;
+  }
+
+  .mobile-summary-card:nth-child(3) .mobile-summary-icon {
+    color: #6f8667;
+    background: #e8efe4;
+  }
+
+  /* ----------------------------------------------------------------------
+     Parcel detail actions: normal document flow.
+     They must sit BELOW notes and never float over them.
+     ---------------------------------------------------------------------- */
+
+  .mobile-detail-actions {
+    position: static !important;
+    bottom: auto !important;
+
+    z-index: auto;
+
+    margin-top: 14px;
+    padding-top: 0;
+
+    background: transparent;
+  }
+
+  .mobile-detail-danger {
+    margin-bottom:
+            calc(
+                    var(--mobile-nav-height) +
+                    env(safe-area-inset-bottom) +
+                    10px
+            );
+  }
+
+  /* ----------------------------------------------------------------------
+     Field mode: the persistent bottom navigation must remain interactive.
+     Do not disable pointer events on its ancestor.
+     ---------------------------------------------------------------------- */
+
+  .field-mode-active .cad-sidebar {
+    display: block !important;
+    pointer-events: auto !important;
+  }
+
+  .field-mode-active .sidebar-mobile {
+    display: block !important;
+    pointer-events: auto !important;
+  }
+
+  .field-mode-active
+  .sidebar-mobile
+  > :not(.mobile-bottom-nav) {
+    display: none !important;
+  }
+
+  .field-mode-active .mobile-bottom-nav {
+    display: grid !important;
+    pointer-events: auto !important;
+  }
+
+  .field-mode-active .mobile-bottom-nav button,
+  .field-mode-active .mobile-bottom-nav .mobile-field-nav {
+    pointer-events: auto !important;
+  }
+
+  /*
+   * Field overlay remains interactive above the map, but stops before the nav.
+   * This prevents it from intercepting taps intended for the bottom menu.
+   */
+  .field-panel-overlay,
+  .field-mobile-shell {
+    bottom:
+            calc(
+                    var(--mobile-nav-height) +
+                    env(safe-area-inset-bottom)
+            ) !important;
+  }
+
+  .field-mobile-content {
+    bottom: 10px !important;
+  }
+}
+
+
+/* ==========================================================================
+   MOBILE FIXES — parcel spacing, auth modal, field navigation + map credits
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /* ----------------------------------------------------------------------
+     Parcel library: same horizontal body margin as the rest of the app
+     ---------------------------------------------------------------------- */
+
+  .mobile-parcels-content {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .mobile-parcels-content
+  .parcel-browser,
+  .mobile-parcels-content
+  .parcel-browser-responsive {
+    width: 100%;
+  }
+
+  /* ----------------------------------------------------------------------
+     Auth modal: center it regardless of whether AuthPanel is opened from
+     the home header or from "Más".
+     ---------------------------------------------------------------------- */
+
+  .auth-modal-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+
+    z-index: 5000 !important;
+
+    width: 100vw !important;
+    height: 100dvh !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    overflow-y: auto !important;
+
+    padding:
+            max(14px, env(safe-area-inset-top))
+            14px
+            calc(
+                    var(--mobile-nav-height, 72px) +
+                    env(safe-area-inset-bottom) +
+                    14px
+            ) !important;
+
+    background:
+            rgba(10, 18, 14, 0.42) !important;
+
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+  }
+
+  .auth-modal-backdrop .auth-modal {
+    position: relative !important;
+
+    z-index: 5001 !important;
+
+    width: min(100%, 410px) !important;
+    max-width: 410px !important;
+
+    max-height:
+            calc(
+                    100dvh -
+                    var(--mobile-nav-height, 72px) -
+                    env(safe-area-inset-bottom) -
+                    34px
+            ) !important;
+
+    margin: 0 !important;
+
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+
+    border-radius: 22px !important;
+  }
+
+  .auth-modal-backdrop
+  .migration-modal {
+    width: min(100%, 440px) !important;
+    max-width: 440px !important;
+  }
+
+  /* ----------------------------------------------------------------------
+     Field mode:
+     - the bottom panel hugs the persistent navigation
+     - attribution and scale hug the top edge of that panel
+     - overlay stops before the nav so nav taps cannot be intercepted
+     ---------------------------------------------------------------------- */
+
+  .field-panel-overlay,
+  .field-mobile-shell {
+    bottom:
+            calc(
+                    var(--mobile-nav-height, 72px) +
+                    env(safe-area-inset-bottom)
+            ) !important;
+  }
+
+  .field-mobile-content {
+    left: 10px !important;
+    right: 10px !important;
+
+    bottom: 8px !important;
+
+    margin: 0 !important;
+  }
+
+  .field-mode-active
+  .maplibregl-ctrl-bottom-right,
+  .field-mode-active
+  .maplibregl-ctrl-bottom-left {
+    bottom:
+            calc(
+                    var(--mobile-nav-height, 72px) +
+                    env(safe-area-inset-bottom) +
+                    var(--field-mobile-panel-height, 250px) +
+                    18px
+            ) !important;
+
+    transition: bottom 180ms ease;
+  }
+
+  .field-mode-active
+  .maplibregl-ctrl-scale {
+    margin-bottom: 0 !important;
+  }
+
+  /* ----------------------------------------------------------------------
+     Bottom navigation must always remain clickable above Field Mode
+     ---------------------------------------------------------------------- */
+
+  .field-mode-active .cad-sidebar,
+  .field-mode-active .sidebar-mobile,
+  .field-mode-active .mobile-bottom-nav,
+  .field-mode-active .mobile-bottom-nav button,
+  .field-mode-active .mobile-bottom-nav .mobile-field-nav {
+    pointer-events: auto !important;
+  }
+
+  .field-mode-active .mobile-bottom-nav {
+    z-index: 6000 !important;
+  }
+
+  /*
+   * The field UI remains above the map but below the persistent nav.
+   */
+  .field-panel-overlay {
+    z-index: 1700 !important;
+  }
+
+  .field-mobile-header {
+    z-index: 1710 !important;
+  }
+
+  .field-mobile-content {
+    z-index: 1710 !important;
+  }
+}
+
+
+/* ==========================================================================
+   MOBILE FIXES 2 — account action + usable field map + collapsible field sheet
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /* ----------------------------------------------------------------------
+     "Más" account card: copy on the left, account/login button on the right
+     ---------------------------------------------------------------------- */
+
+  .mobile-account-card-refined {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0, 1fr)
+      auto !important;
+    align-items: center !important;
+    gap: 14px !important;
+  }
+
+  .mobile-account-card-refined
+  .mobile-account-copy {
+    min-width: 0;
+  }
+
+  .mobile-account-card-refined
+  > .auth-panel,
+  .mobile-account-card-refined
+  > .mobile-topbar-account,
+  .mobile-account-card-refined
+  > :last-child {
+    align-self: center;
+    justify-self: end;
+  }
+
+  .mobile-account-card-refined
+  .guest-account-button,
+  .mobile-account-card-refined
+  .account-pill {
+    width: 52px !important;
+    height: 52px !important;
+
+    display: grid !important;
+    place-items: center !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    border-radius: 14px !important;
+  }
+
+  .mobile-account-card-refined
+  .guest-account-button
+  .guest-dot,
+  .mobile-account-card-refined
+  .guest-dot {
+    width: 16px !important;
+    height: 16px !important;
+
+    display: block !important;
+
+    margin: 0 !important;
+
+    border-width: 3px !important;
+
+    justify-self: center !important;
+    align-self: center !important;
+  }
+
+  /* Hide text inside the compact account action in the More card. */
+  .mobile-account-card-refined
+  .guest-account-button
+  > span:last-child,
+  .mobile-account-card-refined
+  .account-pill
+  > span:not(.account-avatar) {
+    display: none !important;
+  }
+
+  /* ----------------------------------------------------------------------
+     Field mode: sidebar must NOT cover/intercept the map.
+     Its fixed bottom nav can still opt back into pointer events.
+     ---------------------------------------------------------------------- */
+
+  .field-mode-active .cad-sidebar,
+  .field-mode-active .sidebar-mobile {
+    pointer-events: none !important;
+  }
+
+  .field-mode-active .mobile-bottom-nav,
+  .field-mode-active .mobile-bottom-nav button,
+  .field-mode-active .mobile-bottom-nav .mobile-field-nav {
+    pointer-events: auto !important;
+  }
+
+  .field-panel-overlay,
+  .field-mobile-shell {
+    pointer-events: none !important;
+  }
+
+  .field-mobile-header,
+  .field-mobile-content {
+    pointer-events: auto !important;
+  }
+
+  /*
+   * Keep MapLibre controls above field UI and interactive.
+   */
+  .field-mode-active .maplibregl-control-container,
+  .field-mode-active .maplibregl-ctrl-top-right,
+  .field-mode-active .maplibregl-ctrl-bottom-right,
+  .field-mode-active .maplibregl-ctrl-bottom-left,
+  .field-mode-active .maplibregl-ctrl {
+    pointer-events: auto !important;
+  }
+
+  .field-mode-active .maplibregl-control-container {
+    position: relative;
+    z-index: 1650;
+  }
+
+  /* ----------------------------------------------------------------------
+     Field information becomes a real bottom sheet like "Mis parcelas"
+     ---------------------------------------------------------------------- */
+
+  .field-mobile-content {
+    left: 0 !important;
+    right: 0 !important;
+    bottom:
+            calc(
+                    var(--mobile-nav-height, 72px) +
+                    env(safe-area-inset-bottom)
+            ) !important;
+
+    max-height: min(54dvh, 500px) !important;
+
+    gap: 0 !important;
+
+    padding:
+            0
+            12px
+            12px !important;
+
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+
+    border-radius:
+            22px
+            22px
+            0
+            0 !important;
+
+    box-shadow:
+            0 -10px 32px
+            rgba(20, 35, 27, 0.14) !important;
+
+    overflow-y: auto !important;
+
+    transition:
+            max-height 220ms
+            cubic-bezier(0.22, 1, 0.36, 1),
+            padding 220ms
+            cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .field-mobile-sheet-handle {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+
+    width: 100%;
+    height: 30px;
+
+    display: grid;
+    place-items: center;
+
+    flex: 0 0 30px;
+
+    padding: 0;
+    border: 0;
+
+    background:
+            rgba(255, 253, 248, 0.985);
+
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .field-mobile-sheet-handle > span {
+    width: 44px;
+    height: 4px;
+
+    border-radius: 999px;
+
+    background: #aebbb4;
+  }
+
+  .field-mobile-sheet-body {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .field-mobile-content.is-collapsed {
+    max-height: 34px !important;
+
+    padding:
+            0
+            12px
+            4px !important;
+
+    overflow: hidden !important;
+  }
+
+  .field-mobile-content.is-collapsed
+  .field-mobile-sheet-body {
+    display: none;
+  }
+
+  /*
+   * Attribution + scale follow the live measured field sheet,
+   * exactly as they follow "Mis parcelas" on Home.
+   */
+  .field-mode-active
+  .maplibregl-ctrl-bottom-right,
+  .field-mode-active
+  .maplibregl-ctrl-bottom-left {
+    bottom:
+            calc(
+                    var(--mobile-nav-height, 72px) +
+                    env(safe-area-inset-bottom) +
+                    var(--field-mobile-panel-height, 34px) +
+                    8px
+            ) !important;
+
+    display: block !important;
+
+    z-index: 1660 !important;
+  }
+
+  .field-mode-active
+  .maplibregl-ctrl-scale {
+    display: block !important;
+    margin-bottom: 0 !important;
+  }
+
+  .field-mode-active
+  .maplibregl-ctrl-attrib {
+    display: block !important;
+    opacity: 0.92 !important;
+  }
+
+  /*
+   * The earlier field shell bottom offset is no longer needed now that
+   * the bottom sheet positions itself against the persistent nav.
+   */
+  .field-panel-overlay,
+  .field-mobile-shell {
+    bottom: 0 !important;
+  }
+}
+
+
+/* ==========================================================================
+   FIELD MODE — user marker + persistent map view
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  .field-user-marker {
+    position: relative;
+
+    width: 38px;
+    height: 38px;
+
+    display: grid;
+    place-items: center;
+
+    pointer-events: none;
+  }
+
+  .field-user-marker-pulse {
+    position: absolute;
+    inset: 1px;
+
+    border-radius: 50%;
+
+    background:
+            rgba(54, 95, 75, 0.20);
+
+    animation:
+            field-user-pulse
+            1.9s
+            ease-out
+            infinite;
+  }
+
+  .field-user-marker-body {
+    position: relative;
+    z-index: 2;
+
+    width: 29px;
+    height: 29px;
+
+    display: grid;
+    place-items: center;
+
+    border:
+            3px solid
+            #fffdf8;
+
+    border-radius: 50%;
+
+    color: #fff;
+    background: #365f4b;
+
+    box-shadow:
+            0 4px 12px
+            rgba(27, 52, 40, 0.28);
+  }
+
+  .field-user-marker-body svg {
+    width: 17px;
+    height: 17px;
+
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+
+  @keyframes field-user-pulse {
+    0% {
+      opacity: 0.8;
+      transform: scale(0.72);
+    }
+
+    70% {
+      opacity: 0;
+      transform: scale(1.35);
+    }
+
+    100% {
+      opacity: 0;
+      transform: scale(1.35);
+    }
+  }
+
+  .field-mobile-link {
+    min-height: 38px;
+
+    padding: 0 12px;
+
+    border:
+            1px solid
+            rgba(54, 95, 75, 0.13);
+
+    border-radius: 11px;
+
+    background:
+            rgba(234, 242, 237, 0.72);
+  }
+}
+
+/* Marker also works if Field Mode is used on desktop. */
+.field-user-marker {
+  cursor: default;
+}
+
+
+/* ==========================================================================
+   MOBILE TOOLS — focused data-management screen
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /* Keep the same breathing room below headers as the other screens. */
+  .mobile-parcels-content {
+    padding-top: 12px !important;
+  }
+
+  .mobile-tools-page .mobile-page-content {
+    gap: 12px;
+  }
+
+  .mobile-tools-hero {
+    position: relative;
+
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 11px;
+
+    padding: 14px;
+
+    border: 1px solid rgba(35, 53, 43, 0.08);
+    border-radius: 19px;
+
+    background:
+            linear-gradient(
+                    135deg,
+                    #eef4ef 0%,
+                    #faf7ef 100%
+            );
+
+    overflow: hidden;
+  }
+
+  .mobile-tools-hero-icon {
+    width: 46px;
+    height: 46px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 14px;
+
+    color: #fffdf8;
+    background: #365f4b;
+
+    box-shadow:
+            0 8px 18px
+            rgba(54, 95, 75, 0.16);
+  }
+
+  .mobile-tools-hero-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .mobile-tools-hero-copy {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    padding-right: 2px;
+  }
+
+  .mobile-tools-hero-kicker {
+    color: #6a786f;
+
+    font-size: 8px;
+    font-weight: 780;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .mobile-tools-hero-copy strong {
+    color: #172b22;
+
+    font-size: 14px;
+    font-weight: 820;
+    letter-spacing: -0.025em;
+  }
+
+  .mobile-tools-hero-copy p {
+    margin: 2px 0 0;
+
+    color: #67746d;
+
+    font-size: 9px;
+    line-height: 1.45;
+  }
+
+  .mobile-tools-storage-badge {
+    grid-column: 1 / -1;
+
+    justify-self: start;
+
+    display: inline-flex;
+    align-items: center;
+
+    min-height: 25px;
+
+    padding: 0 9px;
+
+    border: 1px solid rgba(54, 95, 75, 0.10);
+    border-radius: 999px;
+
+    color: #365f4b;
+    background: rgba(255, 253, 248, 0.76);
+
+    font-size: 8px;
+    font-weight: 720;
+  }
+
+  .mobile-data-tools-card {
+    padding: 12px !important;
+
+    border-radius: 18px !important;
+
+    background: #fffdf8 !important;
+  }
+
+  .mobile-data-tools-intro {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+
+    margin-bottom: 12px;
+  }
+
+  .mobile-data-tool-feature {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+
+    padding: 10px;
+
+    border: 1px solid rgba(35, 53, 43, 0.07);
+    border-radius: 14px;
+
+    background: #faf8f3;
+  }
+
+  .mobile-data-feature-icon {
+    width: 32px;
+    height: 32px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 10px;
+  }
+
+  .mobile-data-feature-icon.is-green {
+    color: #4f7a65;
+    background: #e8f1ec;
+  }
+
+  .mobile-data-feature-icon.is-amber {
+    color: #b77d29;
+    background: #f7ecd7;
+  }
+
+  .mobile-data-feature-icon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .mobile-data-tool-feature > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .mobile-data-tool-feature strong {
+    color: #172b22;
+
+    font-size: 9.5px;
+    font-weight: 760;
+  }
+
+  .mobile-data-tool-feature small {
+    color: #6c7871;
+
+    font-size: 7.8px;
+    line-height: 1.4;
+  }
+
+  .mobile-refresh-data-action {
+    min-height: 70px;
+
+    border-radius: 17px;
+  }
+
+  .mobile-tools-note {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+
+    padding: 10px 11px;
+
+    border-radius: 14px;
+
+    color: #68756d;
+    background: rgba(54, 95, 75, 0.055);
+
+    font-size: 8px;
+    line-height: 1.45;
+  }
+
+  .mobile-tools-note svg {
+    width: 17px;
+    height: 17px;
+
+    color: #557563;
+  }
 }

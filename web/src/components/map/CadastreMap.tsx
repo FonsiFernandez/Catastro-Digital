@@ -10,6 +10,7 @@ import type { FeatureCollection } from "geojson";
 import {
   AttributionControl,
   Map as MapLibreMapClass,
+  Marker,
   NavigationControl,
   ScaleControl,
   setWorkerUrl,
@@ -71,7 +72,7 @@ type CadastreMapProps = {
   detailMode: boolean;
   fieldLocation: DeviceLocation | null;
   fieldTarget: FieldTarget | null;
-  onSelectParcel: (cadastralRef: string) => void;
+  onSelectParcel: (cadastralRef: string | null) => void;
   onIdentifyPoint: (longitude: number, latitude: number) => void;
 };
 
@@ -260,10 +261,12 @@ function addApplicationLayers(map: MapLibreMap): void {
       type: "circle",
       source: FIELD_LOCATION_SOURCE_ID,
       paint: {
-        "circle-radius": 7,
-        "circle-color": "#2563eb",
+        "circle-radius": 5,
+        "circle-color": "#365f4b",
+        "circle-opacity": 0.18,
         "circle-stroke-color": "#ffffff",
-        "circle-stroke-width": 3,
+        "circle-stroke-opacity": 0,
+        "circle-stroke-width": 0,
       },
     });
   }
@@ -351,6 +354,7 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
     ) {
       const containerRef = useRef<HTMLDivElement | null>(null);
       const mapRef = useRef<MapLibreMap | null>(null);
+      const userMarkerRef = useRef<Marker | null>(null);
       const mapReadyRef = useRef(false);
       const pendingFitRef = useRef<ParcelFeature | null>(null);
       const pendingFitAllRef = useRef(false);
@@ -515,9 +519,24 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
                   | undefined;
 
           if (savedCadastralRef) {
-            onSelectRef.current(
-                savedCadastralRef,
-            );
+            if (fieldModeRef.current) {
+              /*
+               * Field Mode acts like a target selector:
+               * - tap another saved parcel -> follow that parcel
+               * - tap the selected parcel again -> clear the lock and
+               *   return to automatic nearby-parcel detection
+               */
+              onSelectRef.current(
+                  selectedRcRef.current === savedCadastralRef
+                      ? null
+                      : savedCadastralRef,
+              );
+            } else {
+              onSelectRef.current(
+                  savedCadastralRef,
+              );
+            }
+
             return;
           }
 
@@ -578,6 +597,8 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
           mapReadyRef.current = false;
           pendingFitRef.current = null;
           pendingFitAllRef.current = false;
+          userMarkerRef.current?.remove();
+          userMarkerRef.current = null;
           map.remove();
           mapRef.current = null;
         };
@@ -620,6 +641,61 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
         map.getCanvas().style.cursor =
             fieldMode || detailMode ? "" : "crosshair";
       }, [detailMode, fieldMode]);
+
+      useEffect(() => {
+        const map = mapRef.current;
+
+        if (!map || !fieldMode || !fieldLocation) {
+          userMarkerRef.current?.remove();
+          userMarkerRef.current = null;
+          return;
+        }
+
+        if (!userMarkerRef.current) {
+          const element = document.createElement("div");
+          element.className = "field-user-marker";
+          element.setAttribute(
+              "aria-label",
+              "Tu ubicación",
+          );
+
+          element.innerHTML = `
+          <span class="field-user-marker-pulse"></span>
+          <span class="field-user-marker-body">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="8" r="3.2"></circle>
+              <path d="M6.8 19.2c.7-4 2.4-6 5.2-6s4.5 2 5.2 6"></path>
+            </svg>
+          </span>
+        `;
+
+          userMarkerRef.current =
+              new Marker({
+                element,
+                anchor: "center",
+              })
+                  .setLngLat([
+                    fieldLocation.longitude,
+                    fieldLocation.latitude,
+                  ])
+                  .addTo(map);
+        } else {
+          userMarkerRef.current.setLngLat([
+            fieldLocation.longitude,
+            fieldLocation.latitude,
+          ]);
+        }
+
+        return () => {
+          if (!fieldMode) {
+            userMarkerRef.current?.remove();
+            userMarkerRef.current = null;
+          }
+        };
+      }, [
+        fieldLocation,
+        fieldMode,
+      ]);
 
       useEffect(() => {
         const map = mapRef.current;
