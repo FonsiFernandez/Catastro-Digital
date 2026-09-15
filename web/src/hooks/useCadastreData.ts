@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   cadastreApi,
@@ -177,6 +177,7 @@ export function useCadastreData(
   const [parcels, setParcels] = useState<ParcelFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<NoticeState>(null);
+  const refreshRequestIdRef = useRef(0);
 
   const clearNotice = useCallback(
       () => setNotice(null),
@@ -257,8 +258,92 @@ export function useCadastreData(
   ]);
 
   useEffect(() => {
-    void refreshAll();
-  }, [refreshAll]);
+    const requestId =
+        ++refreshRequestIdRef.current;
+
+    const refreshForCurrentSession =
+        async () => {
+          setLoading(true);
+
+          try {
+            const [
+              nextGroups,
+              nextParcels,
+            ] = await Promise.all([
+              authenticated
+                  ? cadastreApi.groups.list()
+                  : guestDb.listGroups(),
+
+              authenticated
+                  ? cadastreApi.parcels
+                      .list(includeDeleted)
+                      .then(
+                          (collection) =>
+                              collection.features,
+                      )
+                  : guestDb.listParcels(
+                      includeDeleted,
+                  ),
+            ]);
+
+            /*
+             * Ignore results from an older
+             * guest/account session.
+             */
+            if (
+                refreshRequestIdRef.current !==
+                requestId
+            ) {
+              return;
+            }
+
+            setGroups(nextGroups);
+            setParcels(nextParcels);
+          } catch (error) {
+            if (
+                refreshRequestIdRef.current !==
+                requestId
+            ) {
+              return;
+            }
+
+            setNotice({
+              type: "error",
+              message: readableApiError(
+                  error,
+                  authenticated
+                      ? "No se pudieron cargar los datos"
+                      : "No se pudieron cargar los datos locales",
+              ),
+            });
+          } finally {
+            if (
+                refreshRequestIdRef.current ===
+                requestId
+            ) {
+              setLoading(false);
+            }
+          }
+        };
+
+    void refreshForCurrentSession();
+
+    return () => {
+      /*
+       * Invalidate this request if the
+       * authentication context changes.
+       */
+      if (
+          refreshRequestIdRef.current ===
+          requestId
+      ) {
+        refreshRequestIdRef.current += 1;
+      }
+    };
+  }, [
+    authenticated,
+    includeDeleted,
+  ]);
 
   // -----------------------------------------------------------------------
   // Identify parcel from map point
