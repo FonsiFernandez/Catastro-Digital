@@ -10143,3 +10143,36 @@ max-height: 760px
     pointer-events: none !important;
   }
 }
+
+@media (min-width: 721px) {
+    .sidebar-desktop .parcel-row {
+        grid-template-columns:
+      6px
+      minmax(0, 1fr)
+      auto;
+    }
+
+    .sidebar-desktop .parcel-main {
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .sidebar-desktop .parcel-name,
+    .sidebar-desktop .parcel-ref {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sidebar-desktop .parcel-area {
+        justify-self: end;
+        margin-left: 8px;
+    }
+
+    .sidebar-desktop .parcel-row::after {
+        content: none !important;
+        display: none !important;
+    }
+}

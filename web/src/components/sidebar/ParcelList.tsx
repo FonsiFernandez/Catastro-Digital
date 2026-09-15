@@ -267,22 +267,10 @@ export function ParcelList({
                                       <span className="parcel-ref">
                                         {props.cadastral_ref}
                                       </span>
-
-                                      <span className="parcel-mobile-dot">
-                                        ·
-                                      </span>
-
-                                      <span className="parcel-mobile-group-name">
-                                        {group?.name ?? "Sin grupo"}
-                                      </span>
                                     </span>
                                   </span>
 
                                         <span className="parcel-row-side">
-                                    <span className="parcel-area">
-                                      {formatHectares(props.area_ha)}
-                                    </span>
-
                                           {props.is_deleted ? (
                                               <span className="deleted-badge">
                                         Borrada
@@ -290,7 +278,7 @@ export function ParcelList({
                                           ) : null}
 
                                           <span className="parcel-mobile-chevron">
-                                      ›
+                                      →
                                     </span>
                                   </span>
                                       </button>
