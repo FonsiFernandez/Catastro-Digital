@@ -9234,7 +9234,7 @@ max-height: 760px
 
     background:
             #f7f3e9
-            url("/ui-icons/profile.png")
+            url("/ui-icons/profile-status-icon.png")
             center / 36px 36px
             no-repeat !important;
 
@@ -9265,7 +9265,7 @@ max-height: 760px
   .account-pill:hover {
     background:
             #f2eddf
-            url("/ui-icons/profile.png")
+            url("/ui-icons/profile-status-icon.png")
             center / 36px 36px
             no-repeat !important;
   }
@@ -9373,7 +9373,7 @@ max-height: 760px
 
     background:
             #f7f3e9
-            url("/ui-icons/profile.png")
+            url("/ui-icons/profile-status-icon.png")
             center / 37px 37px
             no-repeat !important;
 
@@ -9452,7 +9452,7 @@ max-height: 760px
 
     background:
             #edf4ef
-            url("/ui-icons/profile.png")
+            url("/ui-icons/profile-status-icon.png")
             center / 37px 37px
             no-repeat !important;
   }
