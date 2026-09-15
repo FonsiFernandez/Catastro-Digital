@@ -164,6 +164,37 @@ function LayersMiniIcon() {
 }
 
 
+
+function StreetMapMiniIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z" />
+            <path d="M9 3v15M15 6v15" />
+            <path d="M5.5 9.2h2M16.5 14.8h2" />
+        </svg>
+    );
+}
+
+function SatelliteMiniIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="3" />
+            <circle cx="8.2" cy="9" r="1.8" />
+            <path d="m4.8 17 4.6-4.4 3.2 2.8 2.7-2.2 3.9 3.8" />
+        </svg>
+    );
+}
+
+function TopographicMiniIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 17.5c2.2-3.4 4.2-5.1 6-5.1 2.1 0 3.1 2.9 5.1 2.9 1.7 0 3.4-2 6.9-6.3" />
+            <path d="M3 13c2-2.7 3.9-4 5.6-4 2.3 0 3.5 2.7 5.4 2.7 1.6 0 3.4-1.7 7-6" />
+            <path d="M3 21c2.1-3 4-4.5 5.8-4.5 2.2 0 3.3 2.4 5.2 2.4 1.6 0 3.5-1.6 7-5.5" />
+        </svg>
+    );
+}
+
 function ParcelSummaryIcon() {
     return (
         <svg
@@ -786,8 +817,37 @@ export function Sidebar({
                                     </strong>
                                 </div>
 
-                                <div className="mobile-topbar-account">
-                                    {authPanel}
+                                <div className="mobile-topbar-actions">
+                                    <button
+                                        type="button"
+                                        className={
+                                            showCatastro
+                                                ? "mobile-catastro-toggle is-active"
+                                                : "mobile-catastro-toggle"
+                                        }
+                                        onClick={() =>
+                                            onShowCatastro(
+                                                !showCatastro,
+                                            )
+                                        }
+                                        aria-pressed={showCatastro}
+                                        aria-label={
+                                            showCatastro
+                                                ? "Ocultar límites catastrales"
+                                                : "Mostrar límites catastrales"
+                                        }
+                                        title={
+                                            showCatastro
+                                                ? "Ocultar límites catastrales"
+                                                : "Mostrar límites catastrales"
+                                        }
+                                    >
+                                        <LayersMiniIcon />
+                                    </button>
+
+                                    <div className="mobile-topbar-account">
+                                        {authPanel}
+                                    </div>
                                 </div>
                             </header>
 
@@ -802,71 +862,6 @@ export function Sidebar({
                                 />
                             </section>
 
-                            <div
-                                className="mobile-map-chips"
-                                aria-label="Vista del mapa"
-                            >
-                                <button
-                                    type="button"
-                                    className={
-                                        baseMap === "street"
-                                            ? "is-active"
-                                            : ""
-                                    }
-                                    onClick={() =>
-                                        onBaseMap("street")
-                                    }
-                                >
-                                    Mapa
-                                </button>
-
-                                <button
-                                    type="button"
-                                    className={
-                                        baseMap === "aerial"
-                                            ? "is-active"
-                                            : ""
-                                    }
-                                    onClick={() =>
-                                        onBaseMap("aerial")
-                                    }
-                                >
-                                    Ortofoto
-                                </button>
-
-                                <button
-                                    type="button"
-                                    className={
-                                        showCatastro
-                                            ? "is-active"
-                                            : ""
-                                    }
-                                    onClick={() =>
-                                        onShowCatastro(
-                                            !showCatastro,
-                                        )
-                                    }
-                                >
-                                    Catastro
-                                </button>
-
-                                <button
-                                    type="button"
-                                    className={
-                                        baseMap ===
-                                        "topographic"
-                                            ? "is-active"
-                                            : ""
-                                    }
-                                    onClick={() =>
-                                        onBaseMap(
-                                            "topographic",
-                                        )
-                                    }
-                                >
-                                    Relieve
-                                </button>
-                            </div>
                         </div>
 
                         <section
@@ -1112,6 +1107,101 @@ export function Sidebar({
 
                             <div className="mobile-tools-heading">
                 <span>
+                  Mapa base
+                </span>
+                                <small>
+                                    Elige el tipo de mapa que quieres utilizar en toda la aplicación.
+                                </small>
+                            </div>
+
+                            <section
+                                className="mobile-base-map-selector"
+                                aria-label="Mapa base"
+                            >
+                                <button
+                                    type="button"
+                                    className={
+                                        baseMap === "street"
+                                            ? "mobile-base-map-option is-active"
+                                            : "mobile-base-map-option"
+                                    }
+                                    onClick={() =>
+                                        onBaseMap("street")
+                                    }
+                                    aria-pressed={
+                                        baseMap === "street"
+                                    }
+                                >
+                  <span className="mobile-base-map-option-icon">
+                    <StreetMapMiniIcon />
+                  </span>
+                                    <span>
+                    <strong>Callejero</strong>
+                    <small>
+                      Calles, caminos y lugares.
+                    </small>
+                  </span>
+                                    <span className="mobile-base-map-check" />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        baseMap === "aerial"
+                                            ? "mobile-base-map-option is-active"
+                                            : "mobile-base-map-option"
+                                    }
+                                    onClick={() =>
+                                        onBaseMap("aerial")
+                                    }
+                                    aria-pressed={
+                                        baseMap === "aerial"
+                                    }
+                                >
+                  <span className="mobile-base-map-option-icon">
+                    <SatelliteMiniIcon />
+                  </span>
+                                    <span>
+                    <strong>Satélite</strong>
+                    <small>
+                      Imagen aérea del terreno.
+                    </small>
+                  </span>
+                                    <span className="mobile-base-map-check" />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className={
+                                        baseMap === "topographic"
+                                            ? "mobile-base-map-option is-active"
+                                            : "mobile-base-map-option"
+                                    }
+                                    onClick={() =>
+                                        onBaseMap(
+                                            "topographic",
+                                        )
+                                    }
+                                    aria-pressed={
+                                        baseMap ===
+                                        "topographic"
+                                    }
+                                >
+                  <span className="mobile-base-map-option-icon">
+                    <TopographicMiniIcon />
+                  </span>
+                                    <span>
+                    <strong>Topográfico</strong>
+                    <small>
+                      Relieve, curvas y terreno.
+                    </small>
+                  </span>
+                                    <span className="mobile-base-map-check" />
+                                </button>
+                            </section>
+
+                            <div className="mobile-tools-heading">
+                <span>
                   Importar y exportar
                 </span>
                                 <small>
@@ -1186,8 +1276,8 @@ export function Sidebar({
                             <div className="mobile-tools-note">
                                 <InfoMiniIcon />
                                 <span>
-                  Las capas de mapa y Catastro se gestionan directamente
-                  desde Inicio. Modo Campo tiene su propio acceso en la barra inferior.
+                  El mapa base se cambia aquí. Los límites catastrales
+                  se activan o desactivan desde Inicio. Modo Campo tiene su propio acceso en la barra inferior.
                 </span>
                             </div>
                         </div>

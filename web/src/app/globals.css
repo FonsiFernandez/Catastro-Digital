@@ -9025,3 +9025,184 @@ max-height: 760px
     color: #557563;
   }
 }
+
+
+/* ==========================================================================
+   MAP UX — Catastro quick toggle on Home + base maps in Tools
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /* Home header actions */
+  .mobile-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .mobile-catastro-toggle {
+    width: 42px;
+    height: 42px;
+
+    display: grid;
+    place-items: center;
+
+    padding: 0;
+    border: 1px solid rgba(41, 62, 51, 0.10);
+    border-radius: 13px;
+
+    color: #53635b;
+    background: rgba(255, 253, 248, 0.92);
+
+    box-shadow:
+            0 3px 10px
+            rgba(35, 53, 43, 0.07);
+
+    transition:
+            background 140ms ease,
+            color 140ms ease,
+            border-color 140ms ease,
+            transform 120ms ease;
+  }
+
+  .mobile-catastro-toggle:active {
+    transform: scale(0.96);
+  }
+
+  .mobile-catastro-toggle svg {
+    width: 20px;
+    height: 20px;
+
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .mobile-catastro-toggle.is-active {
+    color: #fffdf8;
+    background: #365f4b;
+    border-color: #365f4b;
+  }
+
+  /* Home no longer needs the base-map chip row. */
+  .mobile-home-top-panel .mobile-map-chips {
+    display: none !important;
+  }
+
+  /* Tools: base-map selector */
+  .mobile-base-map-selector {
+    display: grid;
+    gap: 8px;
+
+    padding: 10px;
+
+    border: 1px solid rgba(35, 53, 43, 0.07);
+    border-radius: 18px;
+
+    background: #fffdf8;
+  }
+
+  .mobile-base-map-option {
+    width: 100%;
+    min-height: 62px;
+
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 18px;
+    align-items: center;
+    gap: 10px;
+
+    padding: 9px 10px;
+
+    border: 1px solid rgba(35, 53, 43, 0.07);
+    border-radius: 14px;
+
+    text-align: left;
+
+    color: #27362f;
+    background: #faf8f3;
+
+    transition:
+            background 140ms ease,
+            border-color 140ms ease,
+            transform 120ms ease;
+  }
+
+  .mobile-base-map-option:active {
+    transform: scale(0.99);
+  }
+
+  .mobile-base-map-option-icon {
+    width: 40px;
+    height: 40px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 12px;
+
+    color: #66766e;
+    background: #efeee9;
+  }
+
+  .mobile-base-map-option-icon svg {
+    width: 20px;
+    height: 20px;
+
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .mobile-base-map-option > span:nth-child(2) {
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .mobile-base-map-option strong {
+    color: #172b22;
+
+    font-size: 10px;
+    font-weight: 780;
+  }
+
+  .mobile-base-map-option small {
+    color: #6d7972;
+
+    font-size: 8px;
+    line-height: 1.35;
+  }
+
+  .mobile-base-map-check {
+    width: 16px;
+    height: 16px;
+
+    border: 1.6px solid #bbc2bd;
+    border-radius: 50%;
+
+    background: transparent;
+  }
+
+  .mobile-base-map-option.is-active {
+    border-color: rgba(54, 95, 75, 0.34);
+    background: #eef4ef;
+  }
+
+  .mobile-base-map-option.is-active
+  .mobile-base-map-option-icon {
+    color: #fffdf8;
+    background: #365f4b;
+  }
+
+  .mobile-base-map-option.is-active
+  .mobile-base-map-check {
+    border: 4px solid #365f4b;
+    background: #fffdf8;
+  }
+}
