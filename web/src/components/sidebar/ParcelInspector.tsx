@@ -452,18 +452,6 @@ export function ParcelInspector({
             <strong>
               Detalle de parcela
             </strong>
-
-            <button
-                type="button"
-                className="mobile-detail-more"
-                onClick={() =>
-                    void copyReference()
-                }
-                aria-label="Copiar referencia"
-                title="Copiar referencia"
-            >
-              <span>•••</span>
-            </button>
           </header>
 
           <div

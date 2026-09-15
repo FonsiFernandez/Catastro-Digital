@@ -3742,10 +3742,6 @@ svg {
     border-radius: 13px;
   }
 
-  .mobile-inspector-layer + .mobile-bottom-nav {
-    display: none;
-  }
-
   /* -----------------------------------------------------------------------
      Bottom navigation
      ----------------------------------------------------------------------- */
@@ -4595,10 +4591,15 @@ svg {
 
 @media (max-width: 720px) {
   .mobile-inspector-layer {
-    position: fixed;
-    inset: 0;
-    z-index: 900;
-    overflow: hidden;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: calc(
+            var(--mobile-nav-height) +
+            env(safe-area-inset-bottom)
+    );
+    left: 0;
+    z-index: 60;
     background: var(--mobile-bg);
   }
 
@@ -10218,4 +10219,13 @@ max-height: 760px
         content: none !important;
         display: none !important;
     }
+}
+
+@media (max-width: 720px) {
+  .mobile-page-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
 }

@@ -603,6 +603,11 @@ export function Sidebar({
          */
         onStopFieldMode();
 
+        /*
+         * Close any open parcel detail before changing mobile section.
+         */
+        onCloseInspector();
+
         if (tab === "parcels") {
             setMobileGroupFilterId(null);
         }
@@ -1040,16 +1045,30 @@ export function Sidebar({
                                 </h2>
                             </div>
 
-                            <button
-                                type="button"
-                                className="mobile-refresh"
-                                onClick={() =>
-                                    void onRefresh()
-                                }
-                                aria-label="Actualizar parcelas"
-                            >
-                                <RefreshIcon />
-                            </button>
+                            <div className="mobile-page-head-actions">
+                                {!mobileGroupFilterName ? (
+                                    <button
+                                        type="button"
+                                        className="mobile-primary-small"
+                                        onClick={() =>
+                                            void createMobileGroup()
+                                        }
+                                    >
+                                        + Grupo
+                                    </button>
+                                ) : null}
+
+                                <button
+                                    type="button"
+                                    className="mobile-refresh"
+                                    onClick={() =>
+                                        void onRefresh()
+                                    }
+                                    aria-label="Actualizar parcelas"
+                                >
+                                    <RefreshIcon />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="mobile-page-content mobile-parcels-content">
@@ -1589,7 +1608,10 @@ export function Sidebar({
                     <button
                         type="button"
                         className="mobile-field-nav"
-                        onClick={onStartFieldMode}
+                        onClick={() => {
+                            onCloseInspector();
+                            onStartFieldMode();
+                        }}
                         aria-label="Abrir Modo Campo"
                     >
             <span className="mobile-field-nav-icon">
