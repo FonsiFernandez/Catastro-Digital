@@ -74,6 +74,7 @@ type CadastreMapProps = {
   fieldTarget: FieldTarget | null;
   onSelectParcel: (cadastralRef: string | null) => void;
   onIdentifyPoint: (longitude: number, latitude: number) => void;
+  onCatastroUnavailable?: () => void;
 };
 
 const EMPTY_COLLECTION: FeatureCollection = {
@@ -349,6 +350,7 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
           fieldTarget,
           onSelectParcel,
           onIdentifyPoint,
+          onCatastroUnavailable,
         },
         ref,
     ) {
@@ -369,6 +371,10 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
       const fieldTargetRef = useRef(fieldTarget);
       const onSelectRef = useRef(onSelectParcel);
       const onIdentifyRef = useRef(onIdentifyPoint);
+      const catastroErrorCountRef = useRef(0);
+      const catastroUnavailableRef = useRef(false);
+      const onCatastroUnavailableRef =
+          useRef(onCatastroUnavailable);
 
       parcelsRef.current = parcels;
       selectedRcRef.current = selectedRc;
@@ -381,6 +387,7 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
       fieldTargetRef.current = fieldTarget;
       onSelectRef.current = onSelectParcel;
       onIdentifyRef.current = onIdentifyPoint;
+      onCatastroUnavailableRef.current = onCatastroUnavailable;
 
       useImperativeHandle(ref, () => ({
         fitParcel(parcel) {
@@ -488,7 +495,67 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
         });
 
         map.on("error", (event) => {
-          console.error("MapLibre error:", event.error ?? event);
+          const mapEvent = event as {
+            error?: unknown;
+            sourceId?: string;
+          };
+
+          const error = mapEvent.error;
+
+          const message =
+              error instanceof Error
+                  ? error.message
+                  : typeof error === "string"
+                      ? error
+                      : "";
+
+          const isCatastroError =
+              mapEvent.sourceId ===
+              CATASTRO_SOURCE_ID ||
+              message.includes(
+                  "/api/wms/catastro",
+              );
+
+          if (isCatastroError) {
+            /*
+             * Do not spam the console with one
+             * error for every failed WMS tile.
+             */
+            catastroErrorCountRef.current += 1;
+
+            if (
+                catastroErrorCountRef.current >= 2 &&
+                !catastroUnavailableRef.current
+            ) {
+              catastroUnavailableRef.current =
+                  true;
+
+              if (
+                  map.getLayer(
+                      CATASTRO_LAYER_ID,
+                  )
+              ) {
+                map.setLayoutProperty(
+                    CATASTRO_LAYER_ID,
+                    "visibility",
+                    "none",
+                );
+              }
+
+              onCatastroUnavailableRef.current?.();
+            }
+
+            return;
+          }
+
+          /*
+           * Other MapLibre errors are still useful
+           * and should remain visible.
+           */
+          console.error(
+              "MapLibre error:",
+              error ?? event,
+          );
         });
 
         /*
@@ -627,11 +694,30 @@ export const CadastreMap = forwardRef<CadastreMapHandle, CadastreMapProps>(
 
       useEffect(() => {
         const map = mapRef.current;
-        if (!map?.isStyleLoaded() || !map.getLayer(CATASTRO_LAYER_ID)) return;
+
+        if (
+            !map?.isStyleLoaded() ||
+            !map.getLayer(CATASTRO_LAYER_ID)
+        ) {
+          return;
+        }
+
+        if (showCatastro) {
+          /*
+           * A manual reactivation means:
+           * try the external service again.
+           */
+          catastroErrorCountRef.current = 0;
+          catastroUnavailableRef.current =
+              false;
+        }
+
         map.setLayoutProperty(
             CATASTRO_LAYER_ID,
             "visibility",
-            showCatastro ? "visible" : "none",
+            showCatastro
+                ? "visible"
+                : "none",
         );
       }, [showCatastro]);
 
