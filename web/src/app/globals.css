@@ -7398,7 +7398,7 @@ max-height: 760px
   }
 }
 
-/* ==========================================================================
+/* ========================================================================== 
    MOBILE WELCOME — mockup-matched 3-slide onboarding
    ========================================================================== */
 @media (max-width: 720px) {
@@ -9204,5 +9204,942 @@ max-height: 760px
   .mobile-base-map-check {
     border: 4px solid #365f4b;
     background: #fffdf8;
+  }
+}
+
+
+/* ==========================================================================
+   BRAND ICONS — profile + "Mis parcelas" custom artwork
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /* ----------------------------------------------------------------------
+     Profile / login icon
+     Same visual identity for guest and authenticated states.
+     ---------------------------------------------------------------------- */
+
+  .mobile-topbar-account .guest-account-button,
+  .mobile-topbar-account .account-pill {
+    position: relative;
+
+    width: 42px !important;
+    height: 42px !important;
+
+    display: block !important;
+
+    padding: 0 !important;
+
+    border: 1px solid rgba(35, 53, 43, 0.08) !important;
+    border-radius: 14px !important;
+
+    background:
+            #f7f3e9
+            url("/ui-icons/profile.png")
+            center / 36px 36px
+            no-repeat !important;
+
+    box-shadow:
+            0 3px 10px
+            rgba(35, 53, 43, 0.07) !important;
+
+    overflow: hidden;
+  }
+
+  /*
+   * AuthPanel still provides the real button behaviour/modal.
+   * We only replace its visual contents.
+   */
+  .mobile-topbar-account
+  .guest-account-button
+  > *,
+  .mobile-topbar-account
+  .account-pill
+  > * {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .mobile-topbar-account
+  .guest-account-button:hover,
+  .mobile-topbar-account
+  .account-pill:hover {
+    background:
+            #f2eddf
+            url("/ui-icons/profile.png")
+            center / 36px 36px
+            no-repeat !important;
+  }
+
+  /* ----------------------------------------------------------------------
+     Mis parcelas summary artwork
+     ---------------------------------------------------------------------- */
+
+  .mobile-summary-icon {
+    width: 44px !important;
+    height: 44px !important;
+
+    display: grid !important;
+    place-items: center !important;
+
+    margin-bottom: 6px !important;
+
+    border: 0 !important;
+    border-radius: 13px !important;
+
+    background: transparent !important;
+
+    overflow: visible !important;
+  }
+
+  .mobile-summary-art {
+    display: block;
+
+    width: 42px;
+    height: 42px;
+
+    object-fit: contain;
+
+    filter:
+            drop-shadow(
+                    0 3px 5px
+                    rgba(35, 53, 43, 0.08)
+            );
+  }
+
+  /*
+   * Very subtle card tint so the three cards read as one palette:
+   * morning blue -> midday ochre -> sunset terracotta.
+   */
+  .mobile-summary-card:nth-child(1) {
+    background:
+            linear-gradient(
+                    180deg,
+                    rgba(224, 240, 248, 0.62) 0%,
+                    #fffdf8 58%
+            ) !important;
+  }
+
+  .mobile-summary-card:nth-child(2) {
+    background:
+            linear-gradient(
+                    180deg,
+                    rgba(250, 231, 175, 0.58) 0%,
+                    #fffdf8 58%
+            ) !important;
+  }
+
+  .mobile-summary-card:nth-child(3) {
+    background:
+            linear-gradient(
+                    180deg,
+                    rgba(244, 201, 173, 0.52) 0%,
+                    #fffdf8 58%
+            ) !important;
+  }
+
+  .mobile-summary-card:nth-child(1)
+  .mobile-summary-icon,
+  .mobile-summary-card:nth-child(2)
+  .mobile-summary-icon,
+  .mobile-summary-card:nth-child(3)
+  .mobile-summary-icon {
+    color: inherit !important;
+    background: transparent !important;
+  }
+}
+
+
+/* ==========================================================================
+   ACCOUNT STATUS — clear guest / signed-in state
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  .mobile-topbar-account {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+  }
+
+  .mobile-topbar-account .guest-account-button,
+  .mobile-topbar-account .account-pill {
+    width: 42px !important;
+    height: 42px !important;
+
+    padding: 0 !important;
+
+    border: 1px solid rgba(35, 53, 43, 0.09) !important;
+    border-radius: 13px !important;
+
+    background:
+            #f7f3e9
+            url("/ui-icons/profile.png")
+            center / 37px 37px
+            no-repeat !important;
+
+    box-shadow:
+            0 3px 10px
+            rgba(35, 53, 43, 0.075) !important;
+
+    overflow: hidden;
+  }
+
+  /*
+   * The button keeps all AuthPanel behaviour.
+   * Only its old avatar/text visuals are hidden.
+   */
+  .mobile-topbar-account
+  .guest-account-button
+  > *,
+  .mobile-topbar-account
+  .account-pill
+  > * {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .mobile-account-status {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    z-index: 6;
+
+    width: 15px;
+    height: 15px;
+
+    display: grid;
+    place-items: center;
+
+    border: 2px solid #fffdf8;
+    border-radius: 999px;
+
+    box-shadow:
+            0 2px 5px
+            rgba(31, 49, 40, 0.16);
+
+    pointer-events: none;
+
+    font-size: 8px;
+    line-height: 1;
+    font-weight: 900;
+  }
+
+  /*
+   * Guest = warm amber dot.
+   * It deliberately has no text so the header stays calm.
+   */
+  .mobile-topbar-account.is-guest
+  .mobile-account-status {
+    background: #d9a23d;
+  }
+
+  /*
+   * Signed in = green badge + check.
+   * Shape as well as colour conveys the state.
+   */
+  .mobile-topbar-account.is-authenticated
+  .mobile-account-status {
+    color: #fffdf8;
+    background: #3d765b;
+  }
+
+  .mobile-topbar-account.is-authenticated
+  .guest-account-button,
+  .mobile-topbar-account.is-authenticated
+  .account-pill {
+    border-color:
+            rgba(61, 118, 91, 0.18) !important;
+
+    background:
+            #edf4ef
+            url("/ui-icons/profile.png")
+            center / 37px 37px
+            no-repeat !important;
+  }
+
+  .mobile-topbar-account:active {
+    transform: scale(0.97);
+  }
+}
+
+
+/* ==========================================================================
+   ACCOUNT VISUAL SAFE FIX
+   Keeps AuthPanel logic/modal completely untouched.
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  .mobile-topbar-account {
+    position: relative !important;
+
+    width: 44px !important;
+    height: 44px !important;
+    flex: 0 0 44px !important;
+  }
+
+  .mobile-topbar-account .guest-account-button,
+  .mobile-topbar-account .account-pill {
+    position: relative !important;
+
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+
+    display: block !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    border: 1px solid rgba(35, 53, 43, 0.10) !important;
+    border-radius: 14px !important;
+
+    background: #f7f3e9 !important;
+
+    box-shadow:
+            0 3px 10px rgba(35, 53, 43, 0.07) !important;
+
+    overflow: hidden !important;
+  }
+
+  /*
+   * Hide only the original compact button artwork/text.
+   * Never target the modal or its inputs.
+   */
+  .mobile-topbar-account
+  .guest-account-button
+  > .guest-dot,
+  .mobile-topbar-account
+  .guest-account-button
+  > span:last-child,
+  .mobile-topbar-account
+  .account-pill
+  > .account-avatar,
+  .mobile-topbar-account
+  .account-pill
+  > .account-copy {
+    display: none !important;
+  }
+
+  .mobile-account-art {
+    position: absolute;
+    inset: 4px;
+    z-index: 2;
+
+    width: 36px;
+    height: 36px;
+
+    display: block;
+
+    object-fit: contain;
+
+    pointer-events: none !important;
+  }
+
+  .mobile-account-status {
+    position: absolute !important;
+    right: -3px !important;
+    bottom: -3px !important;
+    z-index: 4 !important;
+
+    width: 16px !important;
+    height: 16px !important;
+
+    display: grid !important;
+    place-items: center !important;
+
+    border: 2px solid #fffdf8 !important;
+    border-radius: 50% !important;
+
+    box-shadow:
+            0 2px 5px rgba(31, 49, 40, 0.18) !important;
+
+    pointer-events: none !important;
+
+    font-size: 8px !important;
+    line-height: 1 !important;
+    font-weight: 900 !important;
+  }
+
+  .mobile-topbar-account.is-guest
+  .mobile-account-status {
+    background: #d6a23f !important;
+  }
+
+  .mobile-topbar-account.is-authenticated
+  .mobile-account-status {
+    color: #fffdf8 !important;
+    background: #3d765b !important;
+  }
+
+  /*
+   * Explicitly restore all auth-modal interaction in case an older override
+   * remains earlier in globals.css.
+   */
+  .auth-modal-backdrop,
+  .auth-modal,
+  .auth-form,
+  .auth-form label,
+  .auth-form input,
+  .auth-form button,
+  .auth-tabs button,
+  .auth-close {
+    pointer-events: auto !important;
+  }
+
+  .auth-form input {
+    opacity: 1 !important;
+    visibility: visible !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
+}
+
+
+/* ==========================================================================
+   AUTH MODAL HIT-TEST FIX
+   The modal was visually fullscreen but its 44px account wrapper still
+   defined the interactive hit area. Expand that wrapper while the modal is
+   open so taps/clicks cannot fall through to the Home screen.
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  .mobile-topbar-account:has(.auth-modal-backdrop) {
+    position: fixed !important;
+    inset: 0 !important;
+
+    z-index: 9000 !important;
+
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    max-height: none !important;
+
+    display: block !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    overflow: visible !important;
+
+    pointer-events: auto !important;
+
+    transform: none !important;
+  }
+
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal-backdrop {
+    position: absolute !important;
+    inset: 0 !important;
+
+    z-index: 9001 !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    pointer-events: auto !important;
+
+    touch-action: auto !important;
+  }
+
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal {
+    position: relative !important;
+
+    z-index: 9002 !important;
+
+    pointer-events: auto !important;
+  }
+
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal *,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal input,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal button,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal label {
+    pointer-events: auto !important;
+  }
+
+  /*
+   * Make every ancestor in the mobile sidebar participate in hit testing
+   * while authentication is open. Normally these shells intentionally use
+   * pointer-events:none so the map remains interactive.
+   */
+  .cad-sidebar:has(.auth-modal-backdrop),
+  .sidebar-mobile:has(.auth-modal-backdrop),
+  .mobile-home-top-panel:has(.auth-modal-backdrop),
+  .mobile-topbar:has(.auth-modal-backdrop) {
+    pointer-events: auto !important;
+  }
+
+  .cad-sidebar:has(.auth-modal-backdrop) {
+    z-index: 8990 !important;
+  }
+
+  .sidebar-mobile:has(.auth-modal-backdrop) {
+    z-index: 8991 !important;
+  }
+
+  /*
+   * The account button remains in the DOM underneath the modal, but must not
+   * receive a second click while its fullscreen wrapper is active.
+   */
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .guest-account-button {
+    pointer-events: none !important;
+  }
+}
+
+
+/* ==========================================================================
+   AUTH MODAL OPEN — keep profile button in place visually
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /*
+   * When the account wrapper expands fullscreen to own the modal hit-area,
+   * hide the compact profile button itself. Otherwise it is laid out at the
+   * fullscreen wrapper's top-left corner.
+   */
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .guest-account-button,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .account-pill,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .mobile-account-art,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .mobile-account-status {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  /*
+   * The modal remains fully visible and interactive.
+   */
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal-backdrop,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal * {
+    visibility: visible !important;
+  }
+}
+
+
+/* ==========================================================================
+   AUTH MODAL FINAL POSITION FIX
+   Keep the profile button in its original header position.
+   The modal itself owns the fullscreen hit-area.
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /*
+   * Undo the previous fullscreen expansion of the account wrapper.
+   */
+  .mobile-topbar-account:has(.auth-modal-backdrop) {
+    position: relative !important;
+    inset: auto !important;
+
+    z-index: auto !important;
+
+    width: 44px !important;
+    height: 44px !important;
+    max-width: 44px !important;
+    max-height: 44px !important;
+
+    display: block !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    overflow: visible !important;
+
+    pointer-events: auto !important;
+
+    transform: none !important;
+  }
+
+  /*
+   * Keep the compact profile control visible in the header.
+   */
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .guest-account-button,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .account-pill,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .mobile-account-art,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .mobile-account-status {
+    visibility: visible !important;
+  }
+
+  /*
+   * The backdrop itself is the fullscreen interactive layer.
+   */
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+
+    z-index: 9001 !important;
+
+    width: 100vw !important;
+    height: 100dvh !important;
+
+    pointer-events: auto !important;
+
+    overflow: auto !important;
+    touch-action: auto !important;
+  }
+
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal {
+    position: relative !important;
+
+    z-index: 9002 !important;
+
+    pointer-events: auto !important;
+  }
+
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal *,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal input,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal button,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .auth-modal label {
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  /*
+   * Some mobile shells intentionally disable pointer-events so the map stays
+   * draggable. Re-enable those ancestors only while auth is open.
+   */
+  .cad-sidebar:has(.auth-modal-backdrop),
+  .sidebar-mobile:has(.auth-modal-backdrop),
+  .mobile-home-top-panel:has(.auth-modal-backdrop),
+  .mobile-topbar:has(.auth-modal-backdrop) {
+    pointer-events: auto !important;
+    overflow: visible !important;
+  }
+}
+
+
+/* ==========================================================================
+   ACCOUNT BUTTON — stable anchor, independent from every modal
+   Final override: the profile control NEVER changes position or size.
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  /*
+   * The account slot is always a normal 44x44 element in the header.
+   * This rule intentionally overrides every previous :has(...) experiment.
+   */
+  .mobile-topbar-account,
+  .mobile-topbar-account:has(.auth-modal-backdrop),
+  .mobile-topbar-account:has(.migration-modal) {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+
+    z-index: auto !important;
+
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    max-width: 44px !important;
+    max-height: 44px !important;
+
+    flex: 0 0 44px !important;
+
+    display: block !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    overflow: visible !important;
+
+    transform: none !important;
+    translate: none !important;
+
+    pointer-events: auto !important;
+  }
+
+  /*
+   * Keep both guest and authenticated controls anchored to that slot.
+   */
+  .mobile-topbar-account
+  > .guest-account-button,
+  .mobile-topbar-account
+  .account-menu,
+  .mobile-topbar-account
+  .account-pill {
+    position: relative !important;
+
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    max-width: 44px !important;
+    max-height: 44px !important;
+
+    margin: 0 !important;
+
+    transform: none !important;
+    translate: none !important;
+  }
+
+  /*
+   * Decorative artwork belongs to the fixed account slot only.
+   */
+  .mobile-topbar-account
+  > .mobile-account-art {
+    position: absolute !important;
+    top: 4px !important;
+    right: 4px !important;
+    bottom: auto !important;
+    left: auto !important;
+
+    width: 36px !important;
+    height: 36px !important;
+
+    transform: none !important;
+
+    visibility: visible !important;
+    pointer-events: none !important;
+  }
+
+  .mobile-topbar-account
+  > .mobile-account-status {
+    position: absolute !important;
+    right: -3px !important;
+    bottom: -3px !important;
+    top: auto !important;
+    left: auto !important;
+
+    visibility: visible !important;
+    pointer-events: none !important;
+  }
+
+  /*
+   * Authentication and migration overlays are fullscreen independently
+   * of the account button. They must never use the button as their layout box.
+   */
+  .mobile-topbar-account
+  .auth-modal-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+
+    z-index: 10000 !important;
+
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+
+    pointer-events: auto !important;
+    overflow: auto !important;
+  }
+
+  .mobile-topbar-account
+  .auth-modal,
+  .mobile-topbar-account
+  .migration-modal {
+    position: relative !important;
+
+    z-index: 10001 !important;
+
+    pointer-events: auto !important;
+  }
+
+  /*
+   * Mobile map/sidebar shells normally let pointer events pass through to
+   * MapLibre. Re-enable only the auth overlay branch while a modal exists.
+   */
+  .cad-sidebar:has(.auth-modal-backdrop),
+  .sidebar-mobile:has(.auth-modal-backdrop),
+  .mobile-home-top-panel:has(.auth-modal-backdrop),
+  .mobile-topbar:has(.auth-modal-backdrop) {
+    pointer-events: auto !important;
+  }
+
+  /*
+   * The modal is above the account button, so clicking the dimmed header
+   * cannot accidentally activate the profile control.
+   */
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  > .guest-account-button,
+  .mobile-topbar-account:has(.auth-modal-backdrop)
+  .account-pill {
+    pointer-events: none !important;
+  }
+}
+
+
+/* ==========================================================================
+   MORE ACCOUNT ICON — same visual language as Home
+   ========================================================================== */
+
+@media (max-width: 720px) {
+  .mobile-more-account-control {
+    position: relative;
+
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+
+    align-self: center;
+  }
+
+  /*
+   * Keep the real AuthPanel button as the clickable surface,
+   * but render the same custom artwork above it.
+   */
+  .mobile-more-account-control
+  > .guest-account-button,
+  .mobile-more-account-control
+  .account-menu,
+  .mobile-more-account-control
+  .account-pill {
+    position: relative !important;
+
+    width: 52px !important;
+    height: 52px !important;
+    min-width: 52px !important;
+    min-height: 52px !important;
+    max-width: 52px !important;
+    max-height: 52px !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    border: 1px solid rgba(35, 53, 43, 0.10) !important;
+    border-radius: 15px !important;
+
+    background: #f7f3e9 !important;
+
+    box-shadow:
+            0 3px 10px rgba(35, 53, 43, 0.07) !important;
+
+    overflow: hidden !important;
+  }
+
+  .mobile-more-account-control
+  .guest-account-button
+  > .guest-dot,
+  .mobile-more-account-control
+  .guest-account-button
+  > span:last-child,
+  .mobile-more-account-control
+  .account-pill
+  > .account-avatar,
+  .mobile-more-account-control
+  .account-pill
+  > .account-copy {
+    display: none !important;
+  }
+
+  .mobile-more-account-art {
+    position: absolute;
+    inset: 5px;
+    z-index: 2;
+
+    width: 42px;
+    height: 42px;
+
+    display: block;
+    object-fit: contain;
+
+    pointer-events: none;
+  }
+
+  .mobile-more-account-status {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    z-index: 4;
+
+    width: 17px;
+    height: 17px;
+
+    display: grid;
+    place-items: center;
+
+    border: 2px solid #fffdf8;
+    border-radius: 50%;
+
+    box-shadow:
+            0 2px 5px rgba(31, 49, 40, 0.18);
+
+    pointer-events: none;
+
+    font-size: 8px;
+    line-height: 1;
+    font-weight: 900;
+  }
+
+  .mobile-more-account-control.is-guest
+  .mobile-more-account-status {
+    background: #d6a23f;
+  }
+
+  .mobile-more-account-control.is-authenticated
+  .mobile-more-account-status {
+    color: #fffdf8;
+    background: #3d765b;
+  }
+
+  /*
+   * Auth and migration overlays remain independent of the account control.
+   * This prevents the profile icon from moving when either modal opens.
+   */
+  .mobile-more-account-control
+  .auth-modal-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+
+    z-index: 10000 !important;
+
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+
+    pointer-events: auto !important;
+    overflow: auto !important;
+  }
+
+  .mobile-more-account-control
+  .auth-modal,
+  .mobile-more-account-control
+  .migration-modal {
+    position: relative !important;
+    z-index: 10001 !important;
+    pointer-events: auto !important;
+  }
+
+  .mobile-more-account-control:has(.auth-modal-backdrop)
+  > .guest-account-button,
+  .mobile-more-account-control:has(.auth-modal-backdrop)
+  .account-pill {
+    pointer-events: none !important;
   }
 }

@@ -845,8 +845,33 @@ export function Sidebar({
                                         <LayersMiniIcon />
                                     </button>
 
-                                    <div className="mobile-topbar-account">
+                                    <div
+                                        className={
+                                            isGuest
+                                                ? "mobile-topbar-account is-guest"
+                                                : "mobile-topbar-account is-authenticated"
+                                        }
+                                        title={
+                                            isGuest
+                                                ? "Modo invitado · datos en este dispositivo"
+                                                : "Sesión iniciada · cuenta sincronizada"
+                                        }
+                                    >
                                         {authPanel}
+
+                                        <img
+                                            src="/ui-icons/profile-status-icon.png"
+                                            alt=""
+                                            aria-hidden="true"
+                                            className="mobile-account-art"
+                                        />
+
+                                        <span
+                                            className="mobile-account-status"
+                                            aria-hidden="true"
+                                        >
+                    {isGuest ? "" : "✓"}
+                  </span>
                                     </div>
                                 </div>
                             </header>
@@ -940,7 +965,11 @@ export function Sidebar({
                                     }
                                 >
                   <span className="mobile-summary-icon">
-                    <ParcelSummaryIcon />
+                    <img
+                        src="/ui-icons/parcel.png"
+                        alt=""
+                        className="mobile-summary-art"
+                    />
                   </span>
                                     <strong>
                                         {activeCount}
@@ -960,7 +989,11 @@ export function Sidebar({
                                     }
                                 >
                   <span className="mobile-summary-icon">
-                    <GroupSummaryIcon />
+                    <img
+                        src="/ui-icons/groups.png"
+                        alt=""
+                        className="mobile-summary-art"
+                    />
                   </span>
                                     <strong>
                                         {groups.length}
@@ -972,7 +1005,11 @@ export function Sidebar({
 
                                 <div className="mobile-summary-card">
                   <span className="mobile-summary-icon">
-                    <AreaSummaryIcon />
+                    <img
+                        src="/ui-icons/surface.png"
+                        alt=""
+                        className="mobile-summary-art"
+                    />
                   </span>
                                     <strong>
                                         {formatHectares(
