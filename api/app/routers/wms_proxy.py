@@ -123,6 +123,13 @@ def _get_catastro_tile(
                     params=params,
                 )
 
+                logger.warning(
+                    "Catastro WMS attempt=%s status=%s content_type=%s",
+                    attempt,
+                    response.status_code,
+                    response.headers.get("Content-Type"),
+                )
+
             if (
                     response.status_code
                     in RETRYABLE_STATUS_CODES
@@ -172,6 +179,13 @@ def _get_catastro_tile(
                 RuntimeError,
         ) as exc:
             last_error = exc
+
+            logger.error(
+                "Catastro WMS attempt=%s failed: %s: %s",
+                attempt,
+                type(exc).__name__,
+                exc,
+            )
 
             if attempt >= MAX_ATTEMPTS:
                 break
