@@ -88,6 +88,7 @@ function addApplicationLayers(map: MapLibreMap): void {
       type: "raster",
       tiles: ["/api/wms/catastro?bbox={bbox-epsg-3857}&width=512&height=512"],
       tileSize: 512,
+      minzoom: 16,
     });
   }
 
