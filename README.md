@@ -8,7 +8,7 @@
 
 <br>
 
-![Version](https://img.shields.io/badge/version-1.4.0-2f6f4e?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.0.0-2f6f4e?style=for-the-badge)
 ![Next.js](https://img.shields.io/badge/Next.js-16.3.1-black?style=for-the-badge&logo=nextdotjs)
 ![React](https://img.shields.io/badge/React-19.2.8-149eca?style=for-the-badge&logo=react&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.141.1-009688?style=for-the-badge&logo=fastapi&logoColor=white)
@@ -26,6 +26,28 @@
 [Tecnologías](#-stack-tecnológico)
 
 </div>
+
+---
+
+## ✅ Estado del proyecto
+
+**Catastro Digital v1.0.0** es la primera versión estable del proyecto.
+
+La versión actual incluye:
+
+- uso completo como invitado;
+- registro e inicio de sesión;
+- migración de datos locales a una cuenta;
+- gestión de parcelas y grupos;
+- identificación de parcelas desde el mapa;
+- búsqueda por referencia catastral;
+- mapas base y límites catastrales;
+- Modo Campo;
+- backup, restauración y exportación GeoJSON;
+- interfaz responsive para escritorio y móvil;
+- persistencia local mediante IndexedDB y persistencia multiusuario mediante PostgreSQL/PostGIS.
+
+La aplicación está preparada para despliegue web. La aplicación móvil nativa para Android e iOS forma parte de la siguiente etapa del proyecto.
 
 ---
 
@@ -636,7 +658,8 @@ DB_PORT=5432
 JWT_SECRET=cambia-esto-en-produccion
 ```
 
-> Para una instalación accesible desde Internet debes utilizar credenciales y secretos propios.
+> Para una instalación accesible desde Internet debes utilizar credenciales y secretos propios.  
+> No reutilices los valores de desarrollo de `.env.example` en producción.
 
 ---
 
@@ -734,27 +757,29 @@ Con cuenta, se guardan en PostgreSQL/PostGIS.
 
 # 📱 Experiencia móvil
 
-La interfaz web es responsive y está siendo diseñada con una experiencia visual coherente con las futuras aplicaciones móviles.
+La versión web de Catastro Digital es responsive y ofrece una experiencia adaptada tanto a escritorio como a móvil.
 
 En móvil, la navegación se organiza en:
 
 ```text
 Inicio
 Parcelas
-Grupos
+Campo
 Herramientas
 Más
 ```
 
-La pantalla principal prioriza:
+La experiencia móvil prioriza:
 
-- mapa;
-- buscador;
-- selector de vista;
-- resumen de parcelas;
-- navegación inferior.
+- mapa y búsqueda;
+- acceso rápido a las parcelas guardadas;
+- activación de los límites catastrales desde Inicio;
+- acceso directo al Modo Campo;
+- gestión de parcelas y grupos desde la sección Parcelas;
+- selección del mapa base desde Herramientas;
+- navegación inferior persistente.
 
-El diseño móvil se está utilizando como base visual común para futuras aplicaciones **Android e iOS**.
+El diseño móvil de la web sirve además como referencia visual para las futuras aplicaciones **Android e iOS**.
 
 ---
 
@@ -1024,14 +1049,15 @@ La aplicación incorpora actualmente:
 - validación de propiedad de grupos;
 - backups limitados al usuario autenticado.
 
-Para producción siguen siendo recomendables mejoras adicionales como:
+La versión 1 cubre la autenticación básica y el aislamiento multiusuario. Para un despliegue público en Internet conviene seguir endureciendo la seguridad con medidas como:
 
-- refresh tokens;
-- revocación de sesión;
+- refresh tokens y revocación de sesión;
 - recuperación de contraseña;
 - verificación de email;
 - rate limiting de autenticación;
-- gestión avanzada de secretos.
+- gestión avanzada de secretos;
+- HTTPS mediante reverse proxy;
+- no exponer PostgreSQL directamente a Internet.
 
 ---
 
