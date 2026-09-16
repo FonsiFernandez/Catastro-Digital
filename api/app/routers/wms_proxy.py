@@ -7,7 +7,9 @@ from threading import BoundedSemaphore, Lock
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
+import logging
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wms", tags=["wms"])
 
