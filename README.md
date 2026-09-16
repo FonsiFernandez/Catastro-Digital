@@ -4,7 +4,7 @@
 
 ### Visor, organizador y herramienta de campo para parcelas catastrales en España
 
-<img src="./CATASTRO_2.PNG" alt="Catastro Digital" width="900">
+<img src="res/img/CATASTRO_2.PNG" alt="Catastro Digital" width="900">
 
 <br>
 
@@ -24,6 +24,7 @@
 [Modo campo](#-modo-campo) ·
 [Backups](#-backup-exportación-e-importación) ·
 [Tecnologías](#-stack-tecnológico)
+[Documentacion](#-documentación)
 
 </div>
 
@@ -1155,6 +1156,19 @@ Catastro Digital intenta resolver un problema cotidiano con herramientas geoespa
 Tus terrenos no deberían ser solamente una lista de códigos.
 
 Deberían poder verse, entenderse, organizarse, recorrerse y conservar su información.
+
+---
+
+## 📚 Documentación
+
+Documentación técnica de la versión actual:
+
+- [Documentación v1.0.0](./docs/1.0.0/)
+- [Arquitectura](./docs/1.0.0/ARCHITECTURE.md)
+- [Backups](./docs/1.0.0/BACKUP.md)
+- [Modo Campo](./docs/1.0.0/FIELD-MODE.md)
+- [Despliegue](./docs/1.0.0/DEPLOYMENT.md)
+- [Seguridad](./docs/1.0.0/SECURITY.md)
 
 ---
 
