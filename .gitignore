@@ -1,5 +1,6 @@
 # Environment
 .env
+.env.*
 *.local
 
 # Python
