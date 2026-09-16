@@ -173,14 +173,13 @@ def _get_catastro_tile(
             return content_type, content
 
         except (
-                httpx.TimeoutException,
-                httpx.NetworkError,
-                httpx.HTTPStatusError,
-                RuntimeError,
+            httpx.RequestError,
+            httpx.HTTPStatusError,
+            RuntimeError,
         ) as exc:
             last_error = exc
 
-            logger.error(
+            logger.exception(
                 "Catastro WMS attempt=%s failed: %s: %s",
                 attempt,
                 type(exc).__name__,
@@ -190,8 +189,6 @@ def _get_catastro_tile(
             if attempt >= MAX_ATTEMPTS:
                 break
 
-            # Small progressive backoff:
-            # 0.35 s, then 0.70 s.
             time.sleep(0.35 * attempt)
 
     raise RuntimeError(
@@ -282,6 +279,11 @@ def catastro_wms_tile(
         )
 
     except Exception as exc:
+        logger.exception(
+            "Catastro WMS proxy failed completely: %s: %s",
+            type(exc).__name__,
+            exc,
+        )
         raise HTTPException(
             status_code=502,
             detail=(
