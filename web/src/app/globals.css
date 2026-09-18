@@ -10229,3 +10229,86 @@ max-height: 760px
     flex: 0 0 auto;
   }
 }
+
+/* Cadastral unit picker */
+.picker-units {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.picker-units-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.picker-units-head > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.picker-units-head strong { font-size: 10.5px; }
+.picker-units-head span { color: var(--text-muted); font-size: 8.5px; }
+
+.picker-units-list {
+  max-height: min(280px, 34dvh);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.picker-unit {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-subtle);
+  cursor: pointer;
+}
+
+.picker-unit:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-hover);
+}
+
+.picker-unit input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.picker-unit > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.picker-unit strong { font-size: 10px; line-height: 1.3; }
+
+.picker-unit span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 8px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-unit-area {
+  flex: 0 0 auto;
+  color: var(--text-soft) !important;
+  font-size: 9px !important;
+  font-weight: 700;
+}

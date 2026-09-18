@@ -297,6 +297,9 @@ export function useAuth() {
                     };
                 }
 
+                const guestUnits =
+                    await guestDb.listAllUnits();
+
                 const backup =
                     await guestDb.exportBackup();
 
@@ -501,6 +504,19 @@ export function useAuth() {
                     throw new Error(
                         "No se pudieron importar los datos locales",
                     );
+                }
+
+                const unitsByParcel =
+                    new Map<string, typeof guestUnits>();
+
+                for (const unit of guestUnits) {
+                    const current = unitsByParcel.get(unit.parcel_ref) ?? [];
+                    current.push(unit);
+                    unitsByParcel.set(unit.parcel_ref, current);
+                }
+
+                for (const [parcelRef, units] of unitsByParcel) {
+                    await cadastreApi.parcels.saveUnitSelection(parcelRef, units);
                 }
 
                 /*

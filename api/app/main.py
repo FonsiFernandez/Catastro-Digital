@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import init_db
-from .routers import backup, groups, parcels, wms_proxy, auth, users
+from .routers import backup, groups, parcels, unit_selections, wms_proxy, auth, users
 
 
 def _cors_origins() -> list[str]:
@@ -35,11 +35,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
 app.include_router(parcels.router)
+app.include_router(unit_selections.router)
 app.include_router(backup.router)
 app.include_router(groups.router)
 app.include_router(wms_proxy.router)

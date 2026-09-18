@@ -244,7 +244,10 @@ export function ParcelPickerPanel({
                             ? onOpenSaved
                             : onSave
                     }
-                    disabled={loading}
+                    disabled={
+                        loading ||
+                        (units.length > 0 && selectedUnitRefs.length === 0)
+                    }
                 >
                     {alreadySaved ? (
                         <MapPinIcon />
@@ -252,11 +255,13 @@ export function ParcelPickerPanel({
                         <PlusIcon />
                     )}
 
-                    {alreadySaved
-                        ? "Abrir parcela"
-                        : loading
-                            ? "Guardando…"
-                            : "Guardar parcela"}
+                    {units.length > 0 && selectedUnitRefs.length === 0
+                        ? "Selecciona al menos uno"
+                        : alreadySaved
+                            ? "Guardar cambios y abrir"
+                            : loading
+                                ? "Guardando…"
+                                : "Guardar parcela"}
                 </button>
             </div>
         </div>

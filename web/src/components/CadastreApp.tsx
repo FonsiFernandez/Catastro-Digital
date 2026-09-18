@@ -12,7 +12,10 @@ import { MobileWelcome } from "@/components/MobileWelcome";
 import { useAuth } from "@/hooks/useAuth";
 import { useCadastreData } from "@/hooks/useCadastreData";
 import { useFieldLocation } from "@/hooks/useFieldLocation";
-import { readableApiError } from "@/lib/api";
+import {
+  cadastreApi,
+  readableApiError,
+} from "@/lib/api";
 import { formatHectares } from "@/lib/format";
 import type { BaseMapId, FieldTarget, ParcelFeature, CadastralUnit } from "@/types/cadastre";
 
@@ -379,6 +382,7 @@ export default function CadastreApp() {
       setPreviewParcel(result.parcel);
       setPreviewUnits(result.units ?? []);
       setSelectedUnitRefs(
+          result.selected_unit_refs ??
           (result.units ?? []).map(
               (unit) => unit.cadastral_ref,
           ),
@@ -414,7 +418,19 @@ export default function CadastreApp() {
     try {
       const saved = await data.savePreviewParcel(
           previewParcel,
+          previewUnits,
+          selectedUnitRefs,
       );
+
+      if (
+          auth.isAuthenticated &&
+          selectedUnitRefs.length > 0
+      ) {
+        await cadastreApi.parcels.saveUnits(
+            previewParcel.properties.cadastral_ref,
+            selectedUnitRefs,
+        );
+      }
 
       setSelectedRc(saved.properties.cadastral_ref);
       setPreviewParcel(null);
@@ -442,6 +458,14 @@ export default function CadastreApp() {
     setSavingPreview(true);
 
     try {
+      if (previewUnits.length > 0) {
+        await data.saveParcelUnits(
+            previewParcel.properties.cadastral_ref,
+            previewUnits,
+            selectedUnitRefs,
+        );
+      }
+
       if (previewParcel.properties.is_deleted) {
         await data.updateParcel(
             previewParcel.properties.cadastral_ref,

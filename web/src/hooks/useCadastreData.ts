@@ -9,6 +9,7 @@ import {
 import { guestDb } from "@/lib/guestDb";
 
 import type {
+  CadastralUnit,
   FieldTarget,
   GroupUpdate,
   NoticeState,
@@ -354,47 +355,57 @@ export function useCadastreData(
           longitude: number,
           latitude: number,
       ) => {
-        const result = authenticated
-            ? await cadastreApi.parcels.identify(
-                longitude,
-                latitude,
-            )
-            : await cadastreApi.parcels.previewIdentify(
-                longitude,
-                latitude,
-            );
+        const baseResult = authenticated
+            ? await cadastreApi.parcels.identify(longitude, latitude)
+            : await cadastreApi.parcels.previewIdentify(longitude, latitude);
 
-        const cadastralRef =
-            result.parcel.properties.cadastral_ref;
+        const cadastralRef = baseResult.parcel.properties.cadastral_ref;
+        let units: CadastralUnit[] = [];
 
         try {
-          const unitsResult =
-              await cadastreApi.parcels.units(
-                  cadastralRef,
-              );
-
-          return {
-            ...result,
-            units: unitsResult.units,
-          };
+          units = (await cadastreApi.parcels.units(cadastralRef)).units;
         } catch (error) {
-          /*
-           * Identifying the parcel is still useful even if
-           * Catastro's alphanumeric service is unavailable.
-           *
-           * Do not make parcel identification fail only because
-           * the associated-property lookup failed.
-           */
-          console.warn(
-              "No se pudieron cargar los inmuebles asociados:",
-              error,
+          console.warn("No se pudieron cargar los inmuebles asociados:", error);
+        }
+
+        let alreadySaved = baseResult.already_saved;
+        let selectedUnitRefs: string[] = [];
+
+        if (authenticated) {
+          if (alreadySaved && units.length > 0) {
+            try {
+              const selected = await cadastreApi.parcels.selectedUnits(cadastralRef);
+              selectedUnitRefs = selected.units.map((unit) => unit.cadastral_ref);
+            } catch (error) {
+              console.warn("No se pudo cargar la selección de inmuebles:", error);
+            }
+          }
+        } else {
+          const rc14 = cadastralRef.replace(/\s+/g, "").toUpperCase().slice(0, 14);
+          const localParcels = await guestDb.listParcels(true);
+          alreadySaved = localParcels.some(
+              (parcel) => parcel.properties.cadastral_ref
+                  .replace(/\s+/g, "")
+                  .toUpperCase()
+                  .slice(0, 14) === rc14,
           );
 
-          return {
-            ...result,
-            units: [],
-          };
+          if (alreadySaved && units.length > 0) {
+            selectedUnitRefs = (await guestDb.listUnits(cadastralRef))
+                .map((unit) => unit.cadastral_ref);
+          }
         }
+
+        if (units.length > 0 && selectedUnitRefs.length === 0) {
+          selectedUnitRefs = units.map((unit) => unit.cadastral_ref);
+        }
+
+        return {
+          ...baseResult,
+          already_saved: alreadySaved,
+          units,
+          selected_unit_refs: selectedUnitRefs,
+        };
       },
       [authenticated],
   );
@@ -574,36 +585,68 @@ export function useCadastreData(
   const savePreviewParcel = useCallback(
       async (
           parcel: ParcelFeature,
+          units: CadastralUnit[] = [],
+          selectedUnitRefs: string[] = [],
       ) => {
-        if (authenticated) {
-          return lookupParcel(
-              parcel.properties.cadastral_ref,
-          );
-        }
-
-        await guestDb.saveParcel(
-            parcel,
+        const selectedUnits = units.filter(
+            (unit) => selectedUnitRefs.includes(unit.cadastral_ref),
         );
 
-        await Promise.all([
-          refreshParcels(),
-          refreshGroups(),
-        ]);
+        if (units.length > 0 && selectedUnits.length === 0) {
+          throw new Error("Selecciona al menos un inmueble antes de guardar");
+        }
 
+        if (authenticated) {
+          const saved = await lookupParcel(parcel.properties.cadastral_ref);
+          if (selectedUnits.length > 0) {
+            await cadastreApi.parcels.saveUnitSelection(
+                parcel.properties.cadastral_ref,
+                selectedUnits,
+            );
+          }
+          return saved;
+        }
+
+        await guestDb.saveParcel(parcel);
+        if (selectedUnits.length > 0) {
+          await guestDb.replaceUnits(parcel.properties.cadastral_ref, selectedUnits);
+        }
+
+        await Promise.all([refreshParcels(), refreshGroups()]);
         setNotice({
           type: "success",
-          message:
-              "Parcela guardada en este navegador",
+          message: selectedUnits.length > 0
+              ? "Parcela e inmuebles guardados en este navegador"
+              : "Parcela guardada en este navegador",
         });
-
         return parcel;
       },
-      [
-        authenticated,
-        lookupParcel,
-        refreshParcels,
-        refreshGroups,
-      ],
+      [authenticated, lookupParcel, refreshParcels, refreshGroups],
+  );
+
+  const saveParcelUnits = useCallback(
+      async (
+          cadastralRef: string,
+          units: CadastralUnit[],
+          selectedUnitRefs: string[],
+      ) => {
+        if (units.length === 0) return;
+
+        const selectedUnits = units.filter(
+            (unit) => selectedUnitRefs.includes(unit.cadastral_ref),
+        );
+
+        if (selectedUnits.length === 0) {
+          throw new Error("Selecciona al menos un inmueble antes de guardar");
+        }
+
+        if (authenticated) {
+          await cadastreApi.parcels.saveUnitSelection(cadastralRef, selectedUnits);
+        } else {
+          await guestDb.replaceUnits(cadastralRef, selectedUnits);
+        }
+      },
+      [authenticated],
   );
 
   // -----------------------------------------------------------------------
@@ -877,6 +920,7 @@ export function useCadastreData(
     fieldPosition,
     lookupParcel,
     savePreviewParcel,
+    saveParcelUnits,
 
     updateParcel,
     deleteParcel,

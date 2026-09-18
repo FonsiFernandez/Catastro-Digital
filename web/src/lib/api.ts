@@ -1,6 +1,7 @@
 import type {
     BackupDocument,
     BackupImportResult,
+    CadastralUnit,
     GroupUpdate,
     FieldPositionResult,
     ImportMode,
@@ -521,6 +522,42 @@ export const cadastreApi = {
 
             return request<ParcelUnitsResult>(
                 `/parcels/${encodeURIComponent(rc14)}/units`,
+            );
+        },
+
+        selectedUnits(
+            cadastralRef: string,
+        ): Promise<ParcelUnitsResult> {
+            const rc14 = cadastralRef
+                .replace(/\s+/g, "")
+                .toUpperCase()
+                .slice(0, 14);
+
+            return request<ParcelUnitsResult>(
+                `/parcels/${encodeURIComponent(rc14)}/units/selection`,
+            );
+        },
+
+        saveUnitSelection(
+            cadastralRef: string,
+            units: CadastralUnit[],
+        ): Promise<{
+            ok: boolean;
+            parcel_ref: string;
+            saved_count: number;
+            units: CadastralUnit[];
+        }> {
+            const rc14 = cadastralRef
+                .replace(/\s+/g, "")
+                .toUpperCase()
+                .slice(0, 14);
+
+            return request(
+                `/parcels/${encodeURIComponent(rc14)}/units/selection`,
+                {
+                    method: "PUT",
+                    body: JSON.stringify({ units }),
+                },
             );
         },
 

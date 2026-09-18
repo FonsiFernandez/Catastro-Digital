@@ -1,5 +1,6 @@
 import type {
     BackupDocument,
+    CadastralUnit,
     ParcelFeature,
     ParcelGroup,
 } from "@/types/cadastre";
@@ -7,10 +8,11 @@ import type {
 import { DEFAULT_PARCEL_COLOR } from "@/lib/map";
 
 const DB_NAME = "catastro-digital";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const PARCEL_STORE = "guest-parcels";
 const GROUP_STORE = "guest-groups";
+const UNIT_STORE = "guest-cadastral-units";
 
 type StoredParcel = {
     cadastral_ref: string;
@@ -63,6 +65,21 @@ function openDatabase(): Promise<IDBDatabase> {
                     {
                         keyPath: "id",
                     },
+                );
+            }
+
+            if (!db.objectStoreNames.contains(UNIT_STORE)) {
+                const unitStore = db.createObjectStore(
+                    UNIT_STORE,
+                    {
+                        keyPath: "cadastral_ref",
+                    },
+                );
+
+                unitStore.createIndex(
+                    "parcel_ref",
+                    "parcel_ref",
+                    { unique: false },
                 );
             }
         };
@@ -503,6 +520,63 @@ export const guestDb = {
         }
     },
 
+    async listUnits(
+        cadastralRef: string,
+    ): Promise<CadastralUnit[]> {
+        const parcelRef = cadastralRef
+            .replace(/\s+/g, "")
+            .toUpperCase()
+            .slice(0, 14);
+
+        const db = await openDatabase();
+        try {
+            const transaction = db.transaction(UNIT_STORE, "readonly");
+            const index = transaction.objectStore(UNIT_STORE).index("parcel_ref");
+            return await requestResult<CadastralUnit[]>(index.getAll(parcelRef));
+        } finally {
+            db.close();
+        }
+    },
+
+    async listAllUnits(): Promise<CadastralUnit[]> {
+        const db = await openDatabase();
+        try {
+            const transaction = db.transaction(UNIT_STORE, "readonly");
+            return await requestResult<CadastralUnit[]>(
+                transaction.objectStore(UNIT_STORE).getAll(),
+            );
+        } finally {
+            db.close();
+        }
+    },
+
+    async replaceUnits(
+        cadastralRef: string,
+        units: CadastralUnit[],
+    ): Promise<void> {
+        const parcelRef = cadastralRef
+            .replace(/\s+/g, "")
+            .toUpperCase()
+            .slice(0, 14);
+
+        const db = await openDatabase();
+        try {
+            const transaction = db.transaction(UNIT_STORE, "readwrite");
+            const store = transaction.objectStore(UNIT_STORE);
+            const index = store.index("parcel_ref");
+            const keys = await requestResult<IDBValidKey[]>(index.getAllKeys(parcelRef));
+
+            for (const key of keys) store.delete(key);
+            for (const unit of units) {
+                store.put({ ...unit, parcel_ref: parcelRef } satisfies CadastralUnit);
+            }
+
+            await transactionDone(transaction);
+        } finally {
+            db.close();
+        }
+    },
+
     async exportBackup(): Promise<BackupDocument> {
         const db = await openDatabase();
 
@@ -598,6 +672,7 @@ export const guestDb = {
                 [
                     GROUP_STORE,
                     PARCEL_STORE,
+                    UNIT_STORE,
                 ],
                 "readwrite",
             );
@@ -608,6 +683,14 @@ export const guestDb = {
 
             transaction
                 .objectStore(PARCEL_STORE)
+                .clear();
+
+            transaction
+                .objectStore(UNIT_STORE)
+                .clear();
+
+            transaction
+                .objectStore(UNIT_STORE)
                 .clear();
 
             await transactionDone(transaction);
@@ -624,6 +707,7 @@ export const guestDb = {
                 [
                     GROUP_STORE,
                     PARCEL_STORE,
+                    UNIT_STORE,
                 ],
                 "readonly",
             );
@@ -640,7 +724,11 @@ export const guestDb = {
                     .count(),
             );
 
-            return groups > 0 || parcels > 0;
+            const units = await requestResult<number>(
+                transaction.objectStore(UNIT_STORE).count(),
+            );
+
+            return groups > 0 || parcels > 0 || units > 0;
         } finally {
             db.close();
         }
