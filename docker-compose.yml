@@ -44,6 +44,7 @@ services:
       context: ./web
       args:
         INTERNAL_API_URL: http://api:8000
+        NEXT_PUBLIC_USE_MOCK_CADASTRE: "true"
     image: catastro-digital-web
     container_name: cadweb_web
     environment:

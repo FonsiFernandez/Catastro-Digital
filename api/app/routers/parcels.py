@@ -4,20 +4,31 @@ import json
 import re
 import uuid
 from typing import Any
-import httpx
 
+import httpx
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from shapely.geometry import Point, shape
 
-from app.db import engine
-from app.services.catastro_circuit import deny_for, is_denied, reason as deny_reason, remaining_seconds
-from app.services.catastro_wfs import fetch_parcel_gml, fetch_parcels_around_point_gml
-from app.services.gml_to_geojson import gml_text_to_geojson_feature, gml_text_to_geojson_features
 from app.auth.dependencies import get_current_user
+from app.db import engine
 from app.models import User
+from app.services.catastro_circuit import (
+    deny_for,
+    is_denied,
+    reason as deny_reason,
+    remaining_seconds,
+)
 from app.services.catastro_properties import fetch_cadastral_units
+from app.services.catastro_wfs import (
+    fetch_parcel_gml,
+    fetch_parcels_around_point_gml,
+)
+from app.services.gml_to_geojson import (
+    gml_text_to_geojson_feature,
+    gml_text_to_geojson_features,
+)
 
 router = APIRouter(prefix="/parcels", tags=["parcels"])
 
@@ -28,68 +39,131 @@ FIELD_SEARCH_RADIUS_M = 500.0
 
 
 class ParcelLookupRequest(BaseModel):
-    cadastral_ref: str = Field(min_length=14, max_length=20)
+    cadastral_ref: str = Field(
+        min_length=14,
+        max_length=20,
+    )
 
 
 class ParcelIdentifyRequest(BaseModel):
-    longitude: float = Field(ge=-19.0, le=5.0)
-    latitude: float = Field(ge=27.0, le=45.0)
+    longitude: float = Field(
+        ge=-19.0,
+        le=5.0,
+    )
+    latitude: float = Field(
+        ge=27.0,
+        le=45.0,
+    )
 
 
 class FieldPositionRequest(BaseModel):
     # GPS tracking itself is global. Saved Catastro parcels are Spanish, so a
     # position elsewhere simply returns no nearby target instead of a 422.
-    longitude: float = Field(ge=-180.0, le=180.0)
-    latitude: float = Field(ge=-90.0, le=90.0)
-    selected_ref: str | None = Field(default=None, min_length=14, max_length=20)
+    longitude: float = Field(
+        ge=-180.0,
+        le=180.0,
+    )
+    latitude: float = Field(
+        ge=-90.0,
+        le=90.0,
+    )
+    selected_ref: str | None = Field(
+        default=None,
+        min_length=14,
+        max_length=20,
+    )
 
 
 class ParcelUpdateRequest(BaseModel):
-    name: str | None = Field(default=None, max_length=160)
-    notes: str | None = Field(default=None, max_length=4000)
+    name: str | None = Field(
+        default=None,
+        max_length=160,
+    )
+    notes: str | None = Field(
+        default=None,
+        max_length=4000,
+    )
     color: str | None = None
     group_id: str | None = None
     is_deleted: bool | None = None
 
 
+class CadastralUnitsSaveRequest(BaseModel):
+    cadastral_refs: list[str] = Field(
+        min_length=1,
+    )
+
+
 def _normalise_rc(value: str) -> str:
     rc = "".join(value.split()).upper()
+
     if not RC_RE.fullmatch(rc):
         raise HTTPException(
             status_code=400,
-            detail="La referencia catastral debe contener entre 14 y 20 caracteres alfanuméricos",
+            detail=(
+                "La referencia catastral debe contener "
+                "entre 14 y 20 caracteres alfanuméricos"
+            ),
         )
+
     return rc
 
 
-def _extract_cadastral_ref(properties: dict[str, Any]) -> str | None:
-    """Find the cadastral reference in GDAL-flattened INSPIRE properties."""
+def _extract_cadastral_ref(
+        properties: dict[str, Any],
+) -> str | None:
+    """
+    Find the cadastral reference in GDAL-flattened
+    INSPIRE properties.
+    """
 
-    preferred_keys = ("nationalcadastralreference", "localid")
+    preferred_keys = (
+        "nationalcadastralreference",
+        "localid",
+    )
+
     normalised = {
-        re.sub(r"[^a-z0-9]", "", str(key).lower()): value
+        re.sub(
+            r"[^a-z0-9]",
+            "",
+            str(key).lower(),
+        ): value
         for key, value in properties.items()
     }
 
     for key in preferred_keys:
         value = normalised.get(key)
+
         if value is None:
             continue
-        candidate = "".join(str(value).split()).upper()
+
+        candidate = "".join(
+            str(value).split()
+        ).upper()
+
         if RC_RE.fullmatch(candidate):
             return candidate
 
     for value in properties.values():
-        if isinstance(value, (str, int)):
-            candidate = "".join(str(value).split()).upper()
+        if isinstance(
+                value,
+                (str, int),
+        ):
+            candidate = "".join(
+                str(value).split()
+            ).upper()
+
             if RC_RE.fullmatch(candidate):
                 return candidate
 
     return None
 
 
-def _catastro_error_is_rate_limit(message: str) -> bool:
+def _catastro_error_is_rate_limit(
+        message: str,
+) -> bool:
     lowered = message.lower()
+
     return (
             "limite de peticiones" in lowered
             or "límite de peticiones" in lowered
@@ -98,38 +172,92 @@ def _catastro_error_is_rate_limit(message: str) -> bool:
     )
 
 
-def _metric(value: Any) -> float | None:
-    return None if value is None else float(value)
+def _metric(
+        value: Any,
+) -> float | None:
+    return (
+        None
+        if value is None
+        else float(value)
+    )
 
 
-def _row_to_feature(row: Any, *, source: str | None = None) -> dict[str, Any]:
+def _row_to_feature(
+        row: Any,
+        *,
+        source: str | None = None,
+) -> dict[str, Any]:
     properties: dict[str, Any] = {
-        "cadastral_ref": row["cadastral_ref"],
-        "name": row["name"],
-        "notes": row.get("notes"),
-        "color": row["color"],
-        "group_id": str(row["group_id"]) if row["group_id"] else None,
-        "is_deleted": row["is_deleted"],
-        "area_m2": _metric(row.get("area_m2")),
-        "area_ha": _metric(row.get("area_ha")),
-        "perimeter_m": _metric(row.get("perimeter_m")),
+        "cadastral_ref":
+            row["cadastral_ref"],
+
+        "name":
+            row["name"],
+
+        "notes":
+            row.get("notes"),
+
+        "color":
+            row["color"],
+
+        "group_id":
+            str(row["group_id"])
+            if row["group_id"]
+            else None,
+
+        "is_deleted":
+            row["is_deleted"],
+
+        "area_m2":
+            _metric(
+                row.get("area_m2")
+            ),
+
+        "area_ha":
+            _metric(
+                row.get("area_ha")
+            ),
+
+        "perimeter_m":
+            _metric(
+                row.get("perimeter_m")
+            ),
     }
+
     if source:
         properties["source"] = source
 
     return {
         "type": "Feature",
-        "geometry": json.loads(row["geom"]),
+        "geometry": json.loads(
+            row["geom"]
+        ),
         "properties": properties,
     }
 
 
 def _parcel_metrics_sql() -> str:
     return """
-        ST_Area(geom_official::geography)::double precision AS area_m2,
-        (ST_Area(geom_official::geography) / 10000.0)::double precision AS area_ha,
-        ST_Perimeter(geom_official::geography)::double precision AS perimeter_m
+        ST_Area(
+            geom_official::geography
+        )::double precision AS area_m2,
+
+        (
+            ST_Area(
+                geom_official::geography
+            ) / 10000.0
+        )::double precision AS area_ha,
+
+        ST_Perimeter(
+            geom_official::geography
+        )::double precision AS perimeter_m
     """
+
+
+# -------------------------------------------------------------------------
+# Cadastral units
+# -------------------------------------------------------------------------
+
 
 @router.get("/{rc}/units")
 async def get_cadastral_units(
@@ -161,8 +289,11 @@ async def get_cadastral_units(
                     floor,
                     door,
                     built_area_m2
+
                 FROM cadastral_units
+
                 WHERE parcel_ref = :parcel_ref
+
                 ORDER BY cadastral_ref ASC
                 """
             ),
@@ -174,15 +305,28 @@ async def get_cadastral_units(
     if cached_rows:
         units = [
             {
-                "cadastral_ref": row["cadastral_ref"],
-                "parcel_ref": row["parcel_ref"],
-                "use": row["use"],
-                "address": row["address"],
-                "floor": row["floor"],
-                "door": row["door"],
-                "built_area_m2": _metric(
-                    row["built_area_m2"]
-                ),
+                "cadastral_ref":
+                    row["cadastral_ref"],
+
+                "parcel_ref":
+                    row["parcel_ref"],
+
+                "use":
+                    row["use"],
+
+                "address":
+                    row["address"],
+
+                "floor":
+                    row["floor"],
+
+                "door":
+                    row["door"],
+
+                "built_area_m2":
+                    _metric(
+                        row["built_area_m2"]
+                    ),
             }
             for row in cached_rows
         ]
@@ -191,7 +335,8 @@ async def get_cadastral_units(
             "parcel_ref": rc14,
             "count": len(units),
             "units": units,
-            "source": "cadastral_units_cache",
+            "source":
+                "cadastral_units_cache",
         }
 
     # ---------------------------------------------------------
@@ -199,15 +344,18 @@ async def get_cadastral_units(
     # ---------------------------------------------------------
 
     try:
-        units = await fetch_cadastral_units(
-            rc14
+        units = (
+            await fetch_cadastral_units(
+                rc14
+            )
         )
 
     except httpx.HTTPStatusError as exc:
         raise HTTPException(
             status_code=502,
             detail=(
-                "Catastro rechazó la consulta de inmuebles: "
+                "Catastro rechazó la consulta "
+                "de inmuebles: "
                 f"HTTP {exc.response.status_code}"
             ),
         ) from exc
@@ -216,8 +364,9 @@ async def get_cadastral_units(
         raise HTTPException(
             status_code=502,
             detail=(
-                "No se pudo conectar con el servicio "
-                f"de inmuebles del Catastro: {exc}"
+                "No se pudo conectar con el "
+                "servicio de inmuebles del "
+                f"Catastro: {exc}"
             ),
         ) from exc
 
@@ -264,17 +413,35 @@ async def get_cadastral_units(
                                    NOW(),
                                    NOW()
                                )
-                            ON CONFLICT (cadastral_ref)
-                        DO UPDATE
-                                                           SET
-                                                               parcel_ref = EXCLUDED.parcel_ref,
-                                                           use = EXCLUDED.use,
-                                                           address = EXCLUDED.address,
-                                                           floor = EXCLUDED.floor,
-                                                           door = EXCLUDED.door,
-                                                           built_area_m2 = EXCLUDED.built_area_m2,
-                                                           last_fetched_at = NOW(),
-                                                           updated_at = NOW()
+
+                            ON CONFLICT (
+                            cadastral_ref
+                        )
+
+                        DO UPDATE SET
+                            parcel_ref =
+                                                           EXCLUDED.parcel_ref,
+
+                                                           use =
+                                                           EXCLUDED.use,
+
+                                                           address =
+                                                           EXCLUDED.address,
+
+                                                           floor =
+                                                           EXCLUDED.floor,
+
+                                                           door =
+                                                           EXCLUDED.door,
+
+                                                           built_area_m2 =
+                                                           EXCLUDED.built_area_m2,
+
+                                                           last_fetched_at =
+                                                           NOW(),
+
+                                                           updated_at =
+                                                           NOW()
                         """
                     ),
                     unit,
@@ -287,6 +454,148 @@ async def get_cadastral_units(
         "source": "catastro_dnprc",
     }
 
+
+@router.post("/{rc}/units/save")
+def save_cadastral_units(
+        rc: str,
+        payload: CadastralUnitsSaveRequest,
+        current_user: User = Depends(
+            get_current_user
+        ),
+) -> dict[str, Any]:
+    """
+    Save the selected cadastral units for the authenticated user.
+
+    The cadastral units themselves are shared public cadastral data.
+    This endpoint only creates the user -> cadastral unit relationships.
+    """
+
+    rc14 = _normalise_rc(rc)[:14]
+
+    # Normalise and remove duplicates while preserving order.
+    selected_refs = list(
+        dict.fromkeys(
+            _normalise_rc(value)
+            for value
+            in payload.cadastral_refs
+        )
+    )
+
+    invalid_refs = [
+        value
+        for value in selected_refs
+        if value[:14] != rc14
+    ]
+
+    if invalid_refs:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Todas las referencias seleccionadas "
+                "deben pertenecer a la misma parcela"
+            ),
+        )
+
+    with engine.begin() as conn:
+        # -----------------------------------------------------
+        # 1. Verify all requested units actually exist in our
+        #    cadastral cache.
+        # -----------------------------------------------------
+
+        available_rows = conn.execute(
+            text(
+                """
+                SELECT cadastral_ref
+
+                FROM cadastral_units
+
+                WHERE parcel_ref = :parcel_ref
+                  AND cadastral_ref = ANY(:refs)
+                """
+            ),
+            {
+                "parcel_ref": rc14,
+                "refs": selected_refs,
+            },
+        ).mappings().all()
+
+        available_refs = {
+            row["cadastral_ref"]
+            for row in available_rows
+        }
+
+        missing_refs = [
+            value
+            for value in selected_refs
+            if value not in available_refs
+        ]
+
+        if missing_refs:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Una o más referencias "
+                    "seleccionadas no existen "
+                    "en la caché catastral"
+                ),
+            )
+
+        # -----------------------------------------------------
+        # 2. Create the user -> unit relationships.
+        # -----------------------------------------------------
+
+        for cadastral_ref in selected_refs:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO
+                        user_cadastral_units (
+                        id,
+                        user_id,
+                        cadastral_ref,
+                        created_at
+                    )
+
+                    VALUES (
+                               gen_random_uuid(),
+                               CAST(:user_id AS uuid),
+                               :cadastral_ref,
+                               NOW()
+                           )
+
+                        ON CONFLICT (
+                        user_id,
+                        cadastral_ref
+                    )
+
+                    DO NOTHING
+                    """
+                ),
+                {
+                    "user_id":
+                        str(current_user.id),
+
+                    "cadastral_ref":
+                        cadastral_ref,
+                },
+            )
+
+    return {
+        "ok": True,
+        "parcel_ref": rc14,
+        "saved_count":
+            len(selected_refs),
+
+        "cadastral_refs":
+            selected_refs,
+    }
+
+
+# -------------------------------------------------------------------------
+# Public parcel preview
+# -------------------------------------------------------------------------
+
+
 @router.post("/preview")
 async def preview_parcel(
         payload: ParcelLookupRequest,
@@ -298,7 +607,9 @@ async def preview_parcel(
     cadastral_parcels or user_parcels.
     """
 
-    rc = _normalise_rc(payload.cadastral_ref)
+    rc = _normalise_rc(
+        payload.cadastral_ref
+    )
     rc14 = rc[:14]
 
     # ---------------------------------------------------------
@@ -312,24 +623,43 @@ async def preview_parcel(
                 """
                 SELECT
                     cadastral_ref,
-                    ST_AsGeoJSON(geom_official) AS geom,
+
+                    ST_AsGeoJSON(
+                            geom_official
+                    ) AS geom,
+
                     ST_Area(
                             geom_official::geography
-                    )::double precision AS area_m2,
+                    )::double precision
+                        AS area_m2,
+
                     (
                         ST_Area(
                             geom_official::geography
                         ) / 10000.0
-                    )::double precision AS area_ha,
+                    )::double precision
+                        AS area_ha,
+
                     ST_Perimeter(
                         geom_official::geography
-                    )::double precision AS perimeter_m
+                    )::double precision
+                        AS perimeter_m
+
                 FROM cadastral_parcels
+
                 WHERE cadastral_ref = :rc
-                   OR LEFT(cadastral_ref, 14) = :rc14
+                   OR LEFT(
+                    cadastral_ref,
+                    14
+                    ) = :rc14
+
                 ORDER BY
-                    (cadastral_ref = :rc) DESC,
+                    (
+                    cadastral_ref = :rc
+                    ) DESC,
+
                     updated_at DESC
+
                     LIMIT 1
                 """
             ),
@@ -343,24 +673,51 @@ async def preview_parcel(
         return {
             "parcel": {
                 "type": "Feature",
-                "geometry": json.loads(cached_row["geom"]),
+
+                "geometry": json.loads(
+                    cached_row["geom"]
+                ),
+
                 "properties": {
-                    "cadastral_ref": cached_row["cadastral_ref"],
+                    "cadastral_ref":
+                        cached_row[
+                            "cadastral_ref"
+                        ],
+
                     "name": None,
                     "notes": None,
-                    "color": DEFAULT_COLOR,
+
+                    "color":
+                        DEFAULT_COLOR,
+
                     "group_id": None,
-                    "is_deleted": False,
-                    "area_m2": _metric(
-                        cached_row["area_m2"]
-                    ),
-                    "area_ha": _metric(
-                        cached_row["area_ha"]
-                    ),
-                    "perimeter_m": _metric(
-                        cached_row["perimeter_m"]
-                    ),
-                    "source": "cadastral_cache",
+
+                    "is_deleted":
+                        False,
+
+                    "area_m2":
+                        _metric(
+                            cached_row[
+                                "area_m2"
+                            ]
+                        ),
+
+                    "area_ha":
+                        _metric(
+                            cached_row[
+                                "area_ha"
+                            ]
+                        ),
+
+                    "perimeter_m":
+                        _metric(
+                            cached_row[
+                                "perimeter_m"
+                            ]
+                        ),
+
+                    "source":
+                        "cadastral_cache",
                 },
             }
         }
@@ -373,38 +730,55 @@ async def preview_parcel(
         raise HTTPException(
             status_code=503,
             detail=(
-                "Catastro está bloqueado temporalmente por rate-limit. "
-                f"Reintenta en ~{remaining_seconds()}s. "
+                "Catastro está bloqueado "
+                "temporalmente por rate-limit. "
+                f"Reintenta en "
+                f"~{remaining_seconds()}s. "
                 f"Motivo: {deny_reason()}"
             ),
         )
 
     try:
-        xml_text, srs_used = await fetch_parcel_gml(
-            rc14
+        xml_text, srs_used = (
+            await fetch_parcel_gml(
+                rc14
+            )
         )
 
     except Exception as exc:
-        message = str(exc) or repr(exc)
+        message = (
+                str(exc)
+                or repr(exc)
+        )
 
-        if _catastro_error_is_rate_limit(message):
+        if _catastro_error_is_rate_limit(
+                message
+        ):
             deny_for(
                 60 * 60,
-                "Límite de peticiones por hora (Catastro)",
+                (
+                    "Límite de peticiones "
+                    "por hora (Catastro)"
+                ),
                 )
 
             raise HTTPException(
                 status_code=503,
                 detail=(
-                    "Catastro ha denegado la petición por límite horario. "
-                    "Las llamadas externas quedan pausadas durante "
-                    "60 minutos."
+                    "Catastro ha denegado la "
+                    "petición por límite horario. "
+                    "Las llamadas externas quedan "
+                    "pausadas durante 60 minutos."
                 ),
             ) from exc
 
         raise HTTPException(
             status_code=502,
-            detail=f"Error llamando WFS Catastro: {type(exc).__name__}: {message}",
+            detail=(
+                "Error llamando WFS Catastro: "
+                f"{type(exc).__name__}: "
+                f"{message}"
+            ),
         ) from exc
 
     # ---------------------------------------------------------
@@ -412,97 +786,156 @@ async def preview_parcel(
     # ---------------------------------------------------------
 
     try:
-        feature = gml_text_to_geojson_feature(
-            xml_text
+        feature = (
+            gml_text_to_geojson_feature(
+                xml_text
+            )
         )
 
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Error convirtiendo GML a GeoJSON: {exc}",
+            detail=(
+                "Error convirtiendo GML "
+                f"a GeoJSON: {exc}"
+            ),
         ) from exc
 
-    geometry = feature.get("geometry")
+    geometry = feature.get(
+        "geometry"
+    )
 
     if not geometry:
         raise HTTPException(
             status_code=502,
-            detail="Catastro devolvió una parcela sin geometría",
+            detail=(
+                "Catastro devolvió una "
+                "parcela sin geometría"
+            ),
         )
 
-    # Prefer the cadastral reference returned by Catastro if present.
-    returned_rc = _extract_cadastral_ref(
-        feature.get("properties") or {}
+    returned_rc = (
+        _extract_cadastral_ref(
+            feature.get(
+                "properties"
+            )
+            or {}
+        )
     )
 
-    actual_rc = returned_rc or rc
+    actual_rc = (
+            returned_rc
+            or rc
+    )
 
     # ---------------------------------------------------------
     # 4. Calculate metrics without storing anything.
     # ---------------------------------------------------------
 
-    geometry_json = json.dumps(geometry)
+    geometry_json = json.dumps(
+        geometry
+    )
 
     with engine.begin() as conn:
         metrics = conn.execute(
             text(
                 """
                 WITH candidate AS (
-                    SELECT ST_Multi(
-                                   ST_SetSRID(
-                                           ST_GeomFromGeoJSON(:geometry),
-                                           4326
-                                   )
-                           ) AS geom
+                    SELECT
+                        ST_Multi(
+                                ST_SetSRID(
+                                        ST_GeomFromGeoJSON(
+                                                :geometry
+                                        ),
+                                        4326
+                                )
+                        ) AS geom
                 )
+
                 SELECT
                     ST_Area(
                             geom::geography
-                    )::double precision AS area_m2,
+                    )::double precision
+                        AS area_m2,
 
                     (
                         ST_Area(
                             geom::geography
                         ) / 10000.0
-                    )::double precision AS area_ha,
+                    )::double precision
+                        AS area_ha,
 
                     ST_Perimeter(
                         geom::geography
-                    )::double precision AS perimeter_m
+                    )::double precision
+                        AS perimeter_m
 
                 FROM candidate
                 """
             ),
             {
-                "geometry": geometry_json,
+                "geometry":
+                    geometry_json,
             },
         ).mappings().one()
 
     return {
         "parcel": {
             "type": "Feature",
-            "geometry": geometry,
+
+            "geometry":
+                geometry,
+
             "properties": {
-                "cadastral_ref": actual_rc,
-                "name": None,
-                "notes": None,
-                "color": DEFAULT_COLOR,
-                "group_id": None,
-                "is_deleted": False,
-                "area_m2": _metric(
-                    metrics["area_m2"]
-                ),
-                "area_ha": _metric(
-                    metrics["area_ha"]
-                ),
-                "perimeter_m": _metric(
-                    metrics["perimeter_m"]
-                ),
-                "source": "catastro_wfs_gml",
-                "srs_in": srs_used,
+                "cadastral_ref":
+                    actual_rc,
+
+                "name":
+                    None,
+
+                "notes":
+                    None,
+
+                "color":
+                    DEFAULT_COLOR,
+
+                "group_id":
+                    None,
+
+                "is_deleted":
+                    False,
+
+                "area_m2":
+                    _metric(
+                        metrics["area_m2"]
+                    ),
+
+                "area_ha":
+                    _metric(
+                        metrics["area_ha"]
+                    ),
+
+                "perimeter_m":
+                    _metric(
+                        metrics[
+                            "perimeter_m"
+                        ]
+                    ),
+
+                "source":
+                    "catastro_wfs_gml",
+
+                "srs_in":
+                    srs_used,
             },
         }
     }
+
+
+# -------------------------------------------------------------------------
+# Public parcel identification
+# -------------------------------------------------------------------------
+
 
 @router.post("/preview-identify")
 async def preview_identify_parcel(
@@ -514,7 +947,12 @@ async def preview_identify_parcel(
     Used by guest mode. It never reads or writes user_parcels.
     """
 
-    point_wkt = f"POINT({payload.longitude} {payload.latitude})"
+    point_wkt = (
+        f"POINT("
+        f"{payload.longitude} "
+        f"{payload.latitude}"
+        f")"
+    )
 
     # ---------------------------------------------------------
     # 1. Reuse globally cached cadastral geometry.
@@ -526,29 +964,47 @@ async def preview_identify_parcel(
                 """
                 SELECT
                     cadastral_ref,
-                    ST_AsGeoJSON(geom_official) AS geom,
+
+                    ST_AsGeoJSON(
+                            geom_official
+                    ) AS geom,
+
                     ST_Area(
                             geom_official::geography
-                    )::double precision AS area_m2,
+                    )::double precision
+                        AS area_m2,
+
                     (
                         ST_Area(
                             geom_official::geography
                         ) / 10000.0
-                    )::double precision AS area_ha,
+                    )::double precision
+                        AS area_ha,
+
                     ST_Perimeter(
                         geom_official::geography
-                    )::double precision AS perimeter_m
+                    )::double precision
+                        AS perimeter_m
+
                 FROM cadastral_parcels
+
                 WHERE ST_Covers(
                     geom_official,
-                    ST_GeomFromText(:point_wkt, 4326)
+                    ST_GeomFromText(
+                    :point_wkt,
+                    4326
                     )
-                ORDER BY updated_at DESC
+                    )
+
+                ORDER BY
+                    updated_at DESC
+
                     LIMIT 1
                 """
             ),
             {
-                "point_wkt": point_wkt,
+                "point_wkt":
+                    point_wkt,
             },
         ).mappings().first()
 
@@ -556,45 +1012,63 @@ async def preview_identify_parcel(
         return {
             "parcel": {
                 "type": "Feature",
-                "geometry": json.loads(
-                    cached_row["geom"]
-                ),
+
+                "geometry":
+                    json.loads(
+                        cached_row[
+                            "geom"
+                        ]
+                    ),
+
                 "properties": {
                     "cadastral_ref":
                         cached_row[
                             "cadastral_ref"
                         ],
 
-                    "name": None,
-                    "notes": None,
-                    "color": DEFAULT_COLOR,
-                    "group_id": None,
-                    "is_deleted": False,
+                    "name":
+                        None,
 
-                    "area_m2": _metric(
-                        cached_row[
-                            "area_m2"
-                        ]
-                    ),
+                    "notes":
+                        None,
 
-                    "area_ha": _metric(
-                        cached_row[
-                            "area_ha"
-                        ]
-                    ),
+                    "color":
+                        DEFAULT_COLOR,
 
-                    "perimeter_m": _metric(
-                        cached_row[
-                            "perimeter_m"
-                        ]
-                    ),
+                    "group_id":
+                        None,
+
+                    "is_deleted":
+                        False,
+
+                    "area_m2":
+                        _metric(
+                            cached_row[
+                                "area_m2"
+                            ]
+                        ),
+
+                    "area_ha":
+                        _metric(
+                            cached_row[
+                                "area_ha"
+                            ]
+                        ),
+
+                    "perimeter_m":
+                        _metric(
+                            cached_row[
+                                "perimeter_m"
+                            ]
+                        ),
 
                     "source":
                         "cadastral_cache",
                 },
             },
 
-            "already_saved": False,
+            "already_saved":
+                False,
         }
 
     # ---------------------------------------------------------
@@ -605,15 +1079,18 @@ async def preview_identify_parcel(
         raise HTTPException(
             status_code=503,
             detail=(
-                "Catastro está bloqueado temporalmente por rate-limit. "
-                f"Reintenta en ~{remaining_seconds()}s. "
+                "Catastro está bloqueado "
+                "temporalmente por rate-limit. "
+                f"Reintenta en "
+                f"~{remaining_seconds()}s. "
                 f"Motivo: {deny_reason()}"
             ),
         )
 
     try:
         xml_text, srs_used = (
-            await fetch_parcels_around_point_gml(
+            await
+            fetch_parcels_around_point_gml(
                 payload.longitude,
                 payload.latitude,
             )
@@ -626,14 +1103,20 @@ async def preview_identify_parcel(
         )
 
     except Exception as exc:
-        message = str(exc) or repr(exc)
+        message = (
+                str(exc)
+                or repr(exc)
+        )
 
         if _catastro_error_is_rate_limit(
                 message
         ):
             deny_for(
                 60 * 60,
-                "Límite de peticiones por hora (Catastro)",
+                (
+                    "Límite de peticiones "
+                    "por hora (Catastro)"
+                ),
                 )
 
             raise HTTPException(
@@ -661,7 +1144,7 @@ async def preview_identify_parcel(
             status_code=502,
             detail=(
                 "Error identificando parcela "
-                f"en Catastro: "
+                "en Catastro: "
                 f"{type(exc).__name__}: "
                 f"{message}"
             ),
@@ -696,6 +1179,7 @@ async def preview_identify_parcel(
             polygon = shape(
                 geometry
             )
+
         except Exception:
             continue
 
@@ -744,36 +1228,82 @@ async def preview_identify_parcel(
     # ---------------------------------------------------------
 
     feature["properties"] = {
-        "cadastral_ref": rc,
-        "name": None,
-        "notes": None,
-        "color": DEFAULT_COLOR,
-        "group_id": None,
-        "is_deleted": False,
-        "area_m2": None,
-        "area_ha": None,
-        "perimeter_m": None,
-        "source": "catastro_wfs_bbox",
-        "srs_in": srs_used,
+        "cadastral_ref":
+            rc,
+
+        "name":
+            None,
+
+        "notes":
+            None,
+
+        "color":
+            DEFAULT_COLOR,
+
+        "group_id":
+            None,
+
+        "is_deleted":
+            False,
+
+        "area_m2":
+            None,
+
+        "area_ha":
+            None,
+
+        "perimeter_m":
+            None,
+
+        "source":
+            "catastro_wfs_bbox",
+
+        "srs_in":
+            srs_used,
     }
 
     return {
-        "parcel": feature,
-        "already_saved": False,
+        "parcel":
+            feature,
+
+        "already_saved":
+            False,
     }
+
+
+# -------------------------------------------------------------------------
+# Authenticated parcel identification
+# -------------------------------------------------------------------------
+
 
 @router.post("/identify")
 async def identify_parcel(
         payload: ParcelIdentifyRequest,
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(
+            get_current_user
+        ),
 ) -> dict[str, Any]:
-    """Identify the cadastral parcel underneath a map click without saving it."""
+    """
+    Identify the cadastral parcel underneath a map click
+    without saving it.
+    """
 
-    point_wkt = f"POINT({payload.longitude} {payload.latitude})"
-    user_id = str(current_user.id)
+    point_wkt = (
+        f"POINT("
+        f"{payload.longitude} "
+        f"{payload.latitude}"
+        f")"
+    )
 
-    # 1. Check whether the authenticated user already has a saved parcel
-    #    covering this point.
+    user_id = str(
+        current_user.id
+    )
+
+    # ---------------------------------------------------------
+    # 1. Check whether the authenticated user already has a
+    #    saved parcel covering this point.
+    # ---------------------------------------------------------
+
     with engine.begin() as conn:
         row = conn.execute(
             text(
@@ -785,124 +1315,268 @@ async def identify_parcel(
                     up.color,
                     up.group_id,
                     up.is_deleted,
-                    ST_AsGeoJSON(cp.geom_official) AS geom,
-                    ST_Area(cp.geom_official::geography)::double precision AS area_m2,
+
+                    ST_AsGeoJSON(
+                            cp.geom_official
+                    ) AS geom,
+
+                    ST_Area(
+                            cp.geom_official::geography
+                    )::double precision
+                        AS area_m2,
+
                     (
-                        ST_Area(cp.geom_official::geography) / 10000.0
-                    )::double precision AS area_ha,
-                    ST_Perimeter(cp.geom_official::geography)::double precision AS perimeter_m
+                        ST_Area(
+                            cp.geom_official::geography
+                        ) / 10000.0
+                    )::double precision
+                        AS area_ha,
+
+                    ST_Perimeter(
+                        cp.geom_official::geography
+                    )::double precision
+                        AS perimeter_m
+
                 FROM user_parcels up
+
                     INNER JOIN cadastral_parcels cp
-                ON cp.cadastral_ref = up.cadastral_ref
-                WHERE up.user_id = CAST(:user_id AS uuid)
+                ON cp.cadastral_ref =
+                    up.cadastral_ref
+
+                WHERE up.user_id =
+                    CAST(:user_id AS uuid)
+
                   AND ST_Covers(
                     cp.geom_official,
-                    ST_GeomFromText(:point_wkt, 4326)
+                    ST_GeomFromText(
+                    :point_wkt,
+                    4326
                     )
+                    )
+
                 ORDER BY
                     up.is_deleted ASC,
                     up.updated_at DESC
+
                     LIMIT 1
                 """
             ),
             {
-                "user_id": user_id,
-                "point_wkt": point_wkt,
+                "user_id":
+                    user_id,
+
+                "point_wkt":
+                    point_wkt,
             },
         ).mappings().first()
 
     if row:
         return {
-            "parcel": _row_to_feature(row, source="db"),
-            "already_saved": True,
+            "parcel":
+                _row_to_feature(
+                    row,
+                    source="db",
+                ),
+
+            "already_saved":
+                True,
         }
 
-    # 2. Check whether the geometry is already cached globally.
-    #    Do not create user_parcels here: identify is only a preview.
+    # ---------------------------------------------------------
+    # 2. Check whether geometry is already cached globally.
+    # ---------------------------------------------------------
+
     with engine.begin() as conn:
         cached_row = conn.execute(
             text(
                 """
                 SELECT
                     cadastral_ref,
-                    ST_AsGeoJSON(geom_official) AS geom,
-                    ST_Area(geom_official::geography)::double precision AS area_m2,
+
+                    ST_AsGeoJSON(
+                            geom_official
+                    ) AS geom,
+
+                    ST_Area(
+                            geom_official::geography
+                    )::double precision
+                        AS area_m2,
+
                     (
-                        ST_Area(geom_official::geography) / 10000.0
-                    )::double precision AS area_ha,
-                    ST_Perimeter(geom_official::geography)::double precision AS perimeter_m
+                        ST_Area(
+                            geom_official::geography
+                        ) / 10000.0
+                    )::double precision
+                        AS area_ha,
+
+                    ST_Perimeter(
+                        geom_official::geography
+                    )::double precision
+                        AS perimeter_m
+
                 FROM cadastral_parcels
+
                 WHERE ST_Covers(
                     geom_official,
-                    ST_GeomFromText(:point_wkt, 4326)
+                    ST_GeomFromText(
+                    :point_wkt,
+                    4326
                     )
-                ORDER BY updated_at DESC
+                    )
+
+                ORDER BY
+                    updated_at DESC
+
                     LIMIT 1
                 """
             ),
-            {"point_wkt": point_wkt},
+            {
+                "point_wkt":
+                    point_wkt,
+            },
         ).mappings().first()
 
     if cached_row:
         return {
             "parcel": {
-                "type": "Feature",
-                "geometry": json.loads(cached_row["geom"]),
+                "type":
+                    "Feature",
+
+                "geometry":
+                    json.loads(
+                        cached_row[
+                            "geom"
+                        ]
+                    ),
+
                 "properties": {
-                    "cadastral_ref": cached_row["cadastral_ref"],
-                    "name": None,
-                    "notes": None,
-                    "color": "#f59e0b",
-                    "group_id": None,
-                    "is_deleted": False,
-                    "area_m2": _metric(cached_row["area_m2"]),
-                    "area_ha": _metric(cached_row["area_ha"]),
-                    "perimeter_m": _metric(cached_row["perimeter_m"]),
-                    "source": "cadastral_cache",
+                    "cadastral_ref":
+                        cached_row[
+                            "cadastral_ref"
+                        ],
+
+                    "name":
+                        None,
+
+                    "notes":
+                        None,
+
+                    "color":
+                        "#f59e0b",
+
+                    "group_id":
+                        None,
+
+                    "is_deleted":
+                        False,
+
+                    "area_m2":
+                        _metric(
+                            cached_row[
+                                "area_m2"
+                            ]
+                        ),
+
+                    "area_ha":
+                        _metric(
+                            cached_row[
+                                "area_ha"
+                            ]
+                        ),
+
+                    "perimeter_m":
+                        _metric(
+                            cached_row[
+                                "perimeter_m"
+                            ]
+                        ),
+
+                    "source":
+                        "cadastral_cache",
                 },
             },
-            "already_saved": False,
+
+            "already_saved":
+                False,
         }
 
+    # ---------------------------------------------------------
     # 3. Nothing cached. Ask Catastro.
+    # ---------------------------------------------------------
+
     if is_denied():
         raise HTTPException(
             status_code=503,
             detail=(
-                "Catastro está bloqueado temporalmente por rate-limit. "
-                f"Reintenta en ~{remaining_seconds()}s. Motivo: {deny_reason()}"
+                "Catastro está bloqueado "
+                "temporalmente por rate-limit. "
+                f"Reintenta en "
+                f"~{remaining_seconds()}s. "
+                f"Motivo: {deny_reason()}"
             ),
         )
 
     try:
-        xml_text, srs_used = await fetch_parcels_around_point_gml(
-            payload.longitude,
-            payload.latitude,
+        xml_text, srs_used = (
+            await
+            fetch_parcels_around_point_gml(
+                payload.longitude,
+                payload.latitude,
+            )
         )
-        features = gml_text_to_geojson_features(xml_text)
+
+        features = (
+            gml_text_to_geojson_features(
+                xml_text
+            )
+        )
 
     except Exception as exc:
-        message = str(exc) or repr(exc)
+        message = (
+                str(exc)
+                or repr(exc)
+        )
 
-        if _catastro_error_is_rate_limit(message):
+        if _catastro_error_is_rate_limit(
+                message
+        ):
             deny_for(
                 60 * 60,
-                "Límite de peticiones por hora (Catastro)",
+                (
+                    "Límite de peticiones "
+                    "por hora (Catastro)"
+                ),
                 )
+
             raise HTTPException(
                 status_code=503,
-                detail="Catastro ha limitado temporalmente las consultas desde el mapa",
+                detail=(
+                    "Catastro ha limitado "
+                    "temporalmente las consultas "
+                    "desde el mapa"
+                ),
             ) from exc
 
-        if "sin features" in message.lower():
+        if (
+                "sin features"
+                in message.lower()
+        ):
             raise HTTPException(
                 status_code=404,
-                detail="No se encontró una parcela en ese punto",
+                detail=(
+                    "No se encontró una parcela "
+                    "en ese punto"
+                ),
             ) from exc
 
         raise HTTPException(
             status_code=502,
-            detail=f"Error identificando parcela en Catastro: {type(exc).__name__}: {message}",
+            detail=(
+                "Error identificando parcela "
+                "en Catastro: "
+                f"{type(exc).__name__}: "
+                f"{message}"
+            ),
         ) from exc
 
     click_point = Point(
@@ -919,21 +1593,34 @@ async def identify_parcel(
     ] = []
 
     for feature in features:
-        geometry = feature.get("geometry")
+        geometry = feature.get(
+            "geometry"
+        )
 
         if not geometry:
             continue
 
         try:
-            polygon = shape(geometry)
+            polygon = shape(
+                geometry
+            )
+
         except Exception:
             continue
 
-        if polygon.is_empty or not polygon.covers(click_point):
+        if (
+                polygon.is_empty
+                or not polygon.covers(
+            click_point
+        )
+        ):
             continue
 
         rc = _extract_cadastral_ref(
-            feature.get("properties") or {}
+            feature.get(
+                "properties"
+            )
+            or {}
         )
 
         if not rc:
@@ -950,7 +1637,10 @@ async def identify_parcel(
     if not matches:
         raise HTTPException(
             status_code=404,
-            detail="No se pudo identificar una parcela exactamente bajo ese punto",
+            detail=(
+                "No se pudo identificar una "
+                "parcela exactamente bajo ese punto"
+            ),
         )
 
     _, feature, rc = min(
@@ -958,101 +1648,238 @@ async def identify_parcel(
         key=lambda item: item[0],
     )
 
-    # 4. The external service may have returned a cadastral reference that
-    #    is already cached, even though the spatial search above found nothing.
+    # ---------------------------------------------------------
+    # 4. External service may have returned a reference that
+    #    already exists in the cache.
+    # ---------------------------------------------------------
+
     with engine.begin() as conn:
         cached_by_ref = conn.execute(
             text(
                 """
                 SELECT
                     cadastral_ref,
-                    ST_AsGeoJSON(geom_official) AS geom,
-                    ST_Area(geom_official::geography)::double precision AS area_m2,
+
+                    ST_AsGeoJSON(
+                            geom_official
+                    ) AS geom,
+
+                    ST_Area(
+                            geom_official::geography
+                    )::double precision
+                        AS area_m2,
+
                     (
-                        ST_Area(geom_official::geography) / 10000.0
-                    )::double precision AS area_ha,
-                    ST_Perimeter(geom_official::geography)::double precision AS perimeter_m
+                        ST_Area(
+                            geom_official::geography
+                        ) / 10000.0
+                    )::double precision
+                        AS area_ha,
+
+                    ST_Perimeter(
+                        geom_official::geography
+                    )::double precision
+                        AS perimeter_m
+
                 FROM cadastral_parcels
+
                 WHERE cadastral_ref = :rc
-                   OR LEFT(cadastral_ref, 14) = :rc14
+                   OR LEFT(
+                    cadastral_ref,
+                    14
+                    ) = :rc14
+
                 ORDER BY
-                    (cadastral_ref = :rc) DESC,
+                    (
+                    cadastral_ref = :rc
+                    ) DESC,
+
                     updated_at DESC
+
                     LIMIT 1
                 """
             ),
             {
-                "rc": rc,
-                "rc14": rc[:14],
+                "rc":
+                    rc,
+
+                "rc14":
+                    rc[:14],
             },
         ).mappings().first()
 
     if cached_by_ref:
         return {
             "parcel": {
-                "type": "Feature",
-                "geometry": json.loads(cached_by_ref["geom"]),
+                "type":
+                    "Feature",
+
+                "geometry":
+                    json.loads(
+                        cached_by_ref[
+                            "geom"
+                        ]
+                    ),
+
                 "properties": {
-                    "cadastral_ref": cached_by_ref["cadastral_ref"],
-                    "name": None,
-                    "notes": None,
-                    "color": "#f59e0b",
-                    "group_id": None,
-                    "is_deleted": False,
-                    "area_m2": _metric(cached_by_ref["area_m2"]),
-                    "area_ha": _metric(cached_by_ref["area_ha"]),
-                    "perimeter_m": _metric(cached_by_ref["perimeter_m"]),
-                    "source": "cadastral_cache",
+                    "cadastral_ref":
+                        cached_by_ref[
+                            "cadastral_ref"
+                        ],
+
+                    "name":
+                        None,
+
+                    "notes":
+                        None,
+
+                    "color":
+                        "#f59e0b",
+
+                    "group_id":
+                        None,
+
+                    "is_deleted":
+                        False,
+
+                    "area_m2":
+                        _metric(
+                            cached_by_ref[
+                                "area_m2"
+                            ]
+                        ),
+
+                    "area_ha":
+                        _metric(
+                            cached_by_ref[
+                                "area_ha"
+                            ]
+                        ),
+
+                    "perimeter_m":
+                        _metric(
+                            cached_by_ref[
+                                "perimeter_m"
+                            ]
+                        ),
+
+                    "source":
+                        "cadastral_cache",
                 },
             },
-            "already_saved": False,
+
+            "already_saved":
+                False,
         }
 
+    # ---------------------------------------------------------
     # 5. Return Catastro preview.
     #    Important: do NOT insert into user_parcels here.
+    # ---------------------------------------------------------
+
     feature["properties"] = {
-        "cadastral_ref": rc,
-        "name": None,
-        "notes": None,
-        "color": "#f59e0b",
-        "group_id": None,
-        "is_deleted": False,
-        "area_m2": None,
-        "area_ha": None,
-        "perimeter_m": None,
-        "source": "catastro_wfs_bbox",
-        "srs_in": srs_used,
+        "cadastral_ref":
+            rc,
+
+        "name":
+            None,
+
+        "notes":
+            None,
+
+        "color":
+            "#f59e0b",
+
+        "group_id":
+            None,
+
+        "is_deleted":
+            False,
+
+        "area_m2":
+            None,
+
+        "area_ha":
+            None,
+
+        "perimeter_m":
+            None,
+
+        "source":
+            "catastro_wfs_bbox",
+
+        "srs_in":
+            srs_used,
     }
 
     return {
-        "parcel": feature,
-        "already_saved": False,
+        "parcel":
+            feature,
+
+        "already_saved":
+            False,
     }
+
+
+# -------------------------------------------------------------------------
+# Field mode
+# -------------------------------------------------------------------------
 
 
 @router.post("/field-position")
 def field_position(
         payload: FieldPositionRequest,
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(
+            get_current_user
+        ),
 ) -> dict[str, Any]:
-    """Resolve a live GPS position against one of the authenticated user's saved parcels.
+    """
+    Resolve a live GPS position against one of the authenticated
+    user's saved parcels.
 
-    When selected_ref is provided it is always the target. Otherwise the endpoint
-    prefers a parcel covering the user's position and falls back to the nearest
-    saved parcel within FIELD_SEARCH_RADIUS_M.
+    When selected_ref is provided it is always the target.
+    Otherwise the endpoint prefers a parcel covering the user's
+    position and falls back to the nearest saved parcel within
+    FIELD_SEARCH_RADIUS_M.
     """
 
-    selected_rc = _normalise_rc(payload.selected_ref) if payload.selected_ref else None
+    selected_rc = (
+        _normalise_rc(
+            payload.selected_ref
+        )
+        if payload.selected_ref
+        else None
+    )
 
     params = {
-        "user_id": str(current_user.id),
-        "longitude": payload.longitude,
-        "latitude": payload.latitude,
-        "selected_rc": selected_rc or "",
-        "selected_rc14": selected_rc[:14] if selected_rc else "",
-        "has_selected": selected_rc is not None,
-        "allow_rc14": bool(selected_rc and len(selected_rc) == 14),
-        "radius_m": FIELD_SEARCH_RADIUS_M,
+        "user_id":
+            str(current_user.id),
+
+        "longitude":
+            payload.longitude,
+
+        "latitude":
+            payload.latitude,
+
+        "selected_rc":
+            selected_rc or "",
+
+        "selected_rc14":
+            selected_rc[:14]
+            if selected_rc
+            else "",
+
+        "has_selected":
+            selected_rc is not None,
+
+        "allow_rc14":
+            bool(
+                selected_rc
+                and len(selected_rc) == 14
+            ),
+
+        "radius_m":
+            FIELD_SEARCH_RADIUS_M,
     }
 
     with engine.begin() as conn:
@@ -1062,7 +1889,10 @@ def field_position(
                 WITH position AS (
                     SELECT
                         ST_SetSRID(
-                                ST_MakePoint(:longitude, :latitude),
+                                ST_MakePoint(
+                                        :longitude,
+                                        :latitude
+                                ),
                                 4326
                         ) AS pt
                 ),
@@ -1081,29 +1911,51 @@ def field_position(
                          FROM user_parcels up
 
                                   INNER JOIN cadastral_parcels cp
-                                             ON cp.cadastral_ref = up.cadastral_ref
+                                             ON cp.cadastral_ref =
+                                                up.cadastral_ref
 
                                   CROSS JOIN position pos
 
-                         WHERE up.user_id = CAST(:user_id AS uuid)
+                         WHERE up.user_id =
+                               CAST(
+                                       :user_id
+                                   AS uuid
+                               )
+
                            AND up.is_deleted = FALSE
+
                            AND (
                              (
                                  :has_selected = TRUE
+
                                      AND (
-                                     up.cadastral_ref = :selected_rc
+                                     up.cadastral_ref =
+                                     :selected_rc
+
                                          OR (
                                          :allow_rc14 = TRUE
-                                             AND LEFT(up.cadastral_ref, 14) = :selected_rc14
+
+                                             AND LEFT(
+                                             up.cadastral_ref,
+                                             14
+                                             ) =
+                                             :selected_rc14
                                          )
                                      )
                                  )
+
                                  OR
+
                              (
                                  :has_selected = FALSE
+
                                      AND ST_DWithin(
-                                         cp.geom_official::geography,
-                                         pos.pt::geography,
+                                         cp.geom_official
+                                             ::geography,
+
+                                         pos.pt
+                                             ::geography,
+
                                          :radius_m
                                          )
                                  )
@@ -1111,24 +1963,39 @@ def field_position(
 
                          ORDER BY
                              CASE
-                                 WHEN :has_selected = TRUE THEN
+                                 WHEN
+                                     :has_selected = TRUE
+                                     THEN
                                      CASE
-                                         WHEN up.cadastral_ref = :selected_rc THEN 0
+                                         WHEN
+                                             up.cadastral_ref =
+                                             :selected_rc
+                                             THEN 0
                                          ELSE 1
                                          END
                                  ELSE
                                      CASE
-                                         WHEN ST_Covers(cp.geom_official, pos.pt) THEN 0
+                                         WHEN ST_Covers(
+                                                 cp.geom_official,
+                                                 pos.pt
+                                              )
+                                             THEN 0
                                          ELSE 1
                                          END
                                  END,
 
                              CASE
-                                 WHEN :has_selected = TRUE THEN 0
-                                 ELSE ST_Distance(
-                                         cp.geom_official::geography,
-                                         pos.pt::geography
-                                      )
+                                 WHEN
+                                     :has_selected = TRUE
+                                     THEN 0
+                                 ELSE
+                                     ST_Distance(
+                                             cp.geom_official
+                                                 ::geography,
+
+                                             pos.pt
+                                                 ::geography
+                                     )
                                  END,
 
                              up.updated_at DESC
@@ -1151,18 +2018,24 @@ def field_position(
                     ) AS geom,
 
                     ST_Area(
-                            t.geom_official::geography
-                    )::double precision AS area_m2,
+                            t.geom_official
+                                ::geography
+                    )::double precision
+                        AS area_m2,
 
                     (
                         ST_Area(
-                            t.geom_official::geography
+                            t.geom_official
+                                ::geography
                         ) / 10000.0
-                    )::double precision AS area_ha,
+                    )::double precision
+                        AS area_ha,
 
                     ST_Perimeter(
-                        t.geom_official::geography
-                    )::double precision AS perimeter_m,
+                        t.geom_official
+                            ::geography
+                    )::double precision
+                        AS perimeter_m,
 
                     ST_Covers(
                         t.geom_official,
@@ -1173,12 +2046,16 @@ def field_position(
                         ST_Boundary(
                             t.geom_official
                         )::geography,
+
                         pos.pt::geography
-                    )::double precision AS boundary_distance_m,
+                    )::double precision
+                        AS boundary_distance_m,
 
                     ST_AsGeoJSON(
                         ST_ClosestPoint(
-                            ST_Boundary(t.geom_official),
+                            ST_Boundary(
+                                t.geom_official
+                            ),
                             pos.pt
                         )
                     ) AS nearest_boundary
@@ -1189,7 +2066,11 @@ def field_position(
 
                     LEFT JOIN parcel_groups g
                 ON g.id = t.group_id
-                    AND g.user_id = CAST(:user_id AS uuid)
+                    AND g.user_id =
+                    CAST(
+                    :user_id
+                    AS uuid
+                    )
                 """
             ),
             params,
@@ -1197,40 +2078,73 @@ def field_position(
 
     if not row:
         return {
-            "target": None,
-            "search_radius_m": FIELD_SEARCH_RADIUS_M,
+            "target":
+                None,
+
+            "search_radius_m":
+                FIELD_SEARCH_RADIUS_M,
         }
 
     return {
         "target": {
-            "parcel": _row_to_feature(
-                row,
-                source="field",
-            ),
-            "group_name": row["group_name"],
-            "inside": bool(row["inside"]),
-            "boundary_distance_m": float(
-                row["boundary_distance_m"]
-            ),
-            "nearest_boundary": json.loads(
-                row["nearest_boundary"]
-            ),
+            "parcel":
+                _row_to_feature(
+                    row,
+                    source="field",
+                ),
+
+            "group_name":
+                row["group_name"],
+
+            "inside":
+                bool(
+                    row["inside"]
+                ),
+
+            "boundary_distance_m":
+                float(
+                    row[
+                        "boundary_distance_m"
+                    ]
+                ),
+
+            "nearest_boundary":
+                json.loads(
+                    row[
+                        "nearest_boundary"
+                    ]
+                ),
         },
-        "search_radius_m": FIELD_SEARCH_RADIUS_M,
+
+        "search_radius_m":
+            FIELD_SEARCH_RADIUS_M,
     }
+
+
+# -------------------------------------------------------------------------
+# Lookup / save parcel
+# -------------------------------------------------------------------------
 
 
 @router.post("/lookup")
 async def lookup_parcel(
         payload: ParcelLookupRequest,
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(
+            get_current_user
+        ),
 ) -> dict[str, Any]:
-    rc = _normalise_rc(payload.cadastral_ref)
+    rc = _normalise_rc(
+        payload.cadastral_ref
+    )
+
     rc14 = rc[:14]
-    user_id = str(current_user.id)
+
+    user_id = str(
+        current_user.id
+    )
 
     # ---------------------------------------------------------
-    # 1. Check whether this user already has the parcel saved
+    # 1. Check whether this user already has the parcel saved.
     # ---------------------------------------------------------
 
     with engine.begin() as conn:
@@ -1244,48 +2158,86 @@ async def lookup_parcel(
                     up.color,
                     up.group_id,
                     up.is_deleted,
-                    ST_AsGeoJSON(cp.geom_official) AS geom,
-                    ST_Area(cp.geom_official::geography)::double precision AS area_m2,
+
+                    ST_AsGeoJSON(
+                            cp.geom_official
+                    ) AS geom,
+
+                    ST_Area(
+                            cp.geom_official
+                                ::geography
+                    )::double precision
+                        AS area_m2,
+
                     (
-                        ST_Area(cp.geom_official::geography) / 10000.0
-                    )::double precision AS area_ha,
+                        ST_Area(
+                            cp.geom_official
+                                ::geography
+                        ) / 10000.0
+                    )::double precision
+                        AS area_ha,
+
                     ST_Perimeter(
-                        cp.geom_official::geography
-                    )::double precision AS perimeter_m
+                        cp.geom_official
+                            ::geography
+                    )::double precision
+                        AS perimeter_m
+
                 FROM user_parcels up
+
                     INNER JOIN cadastral_parcels cp
-                ON cp.cadastral_ref = up.cadastral_ref
-                WHERE up.user_id = CAST(:user_id AS uuid)
+                ON cp.cadastral_ref =
+                    up.cadastral_ref
+
+                WHERE up.user_id =
+                    CAST(
+                    :user_id
+                    AS uuid
+                    )
+
                   AND (
                     up.cadastral_ref = :rc
-                   OR LEFT(up.cadastral_ref, 14) = :rc14
+
+                   OR LEFT(
+                    up.cadastral_ref,
+                    14
+                    ) = :rc14
                     )
+
                 ORDER BY
-                    (up.cadastral_ref = :rc) DESC,
+                    (
+                    up.cadastral_ref = :rc
+                    ) DESC,
+
                     up.updated_at DESC
+
                     LIMIT 1
                 """
             ),
             {
-                "user_id": user_id,
-                "rc": rc,
-                "rc14": rc14,
+                "user_id":
+                    user_id,
+
+                "rc":
+                    rc,
+
+                "rc14":
+                    rc14,
             },
         ).mappings().first()
 
     if row:
         return {
-            "parcel": _row_to_feature(
-                row,
-                source="db",
-            )
+            "parcel":
+                _row_to_feature(
+                    row,
+                    source="db",
+                )
         }
 
     # ---------------------------------------------------------
     # 2. Maybe another user already caused this cadastral
     #    geometry to be downloaded.
-    #
-    #    In that case we reuse it without calling Catastro.
     # ---------------------------------------------------------
 
     with engine.begin() as conn:
@@ -1293,23 +2245,40 @@ async def lookup_parcel(
             text(
                 """
                 SELECT cadastral_ref
+
                 FROM cadastral_parcels
+
                 WHERE cadastral_ref = :rc
-                   OR LEFT(cadastral_ref, 14) = :rc14
+                   OR LEFT(
+                    cadastral_ref,
+                    14
+                    ) = :rc14
+
                 ORDER BY
-                    (cadastral_ref = :rc) DESC,
+                    (
+                    cadastral_ref = :rc
+                    ) DESC,
+
                     updated_at DESC
+
                     LIMIT 1
                 """
             ),
             {
-                "rc": rc,
-                "rc14": rc14,
+                "rc":
+                    rc,
+
+                "rc14":
+                    rc14,
             },
         ).mappings().first()
 
         if cadastral_row:
-            actual_rc = cadastral_row["cadastral_ref"]
+            actual_rc = (
+                cadastral_row[
+                    "cadastral_ref"
+                ]
+            )
 
             conn.execute(
                 text(
@@ -1322,24 +2291,37 @@ async def lookup_parcel(
                         created_at,
                         updated_at
                     )
+
                     VALUES (
-                               CAST(:user_id AS uuid),
+                               CAST(
+                                       :user_id
+                                   AS uuid
+                               ),
+
                                :rc,
                                :color,
                                FALSE,
                                NOW(),
                                NOW()
                            )
+
                         ON CONFLICT (
                         user_id,
                         cadastral_ref
-                    ) DO NOTHING
+                    )
+
+                    DO NOTHING
                     """
                 ),
                 {
-                    "user_id": user_id,
-                    "rc": actual_rc,
-                    "color": DEFAULT_COLOR,
+                    "user_id":
+                        user_id,
+
+                    "rc":
+                        actual_rc,
+
+                    "color":
+                        DEFAULT_COLOR,
                 },
             )
 
@@ -1353,36 +2335,64 @@ async def lookup_parcel(
                         up.color,
                         up.group_id,
                         up.is_deleted,
-                        ST_AsGeoJSON(cp.geom_official) AS geom,
+
+                        ST_AsGeoJSON(
+                                cp.geom_official
+                        ) AS geom,
+
                         ST_Area(
-                                cp.geom_official::geography
-                        )::double precision AS area_m2,
+                                cp.geom_official
+                                    ::geography
+                        )::double precision
+                            AS area_m2,
+
                         (
                             ST_Area(
-                                cp.geom_official::geography
+                                cp.geom_official
+                                    ::geography
                             ) / 10000.0
-                        )::double precision AS area_ha,
+                        )::double precision
+                            AS area_ha,
+
                         ST_Perimeter(
-                            cp.geom_official::geography
-                        )::double precision AS perimeter_m
+                            cp.geom_official
+                                ::geography
+                        )::double precision
+                            AS perimeter_m
+
                     FROM user_parcels up
+
                         INNER JOIN cadastral_parcels cp
-                    ON cp.cadastral_ref = up.cadastral_ref
-                    WHERE up.user_id = CAST(:user_id AS uuid)
-                      AND up.cadastral_ref = :rc
+                    ON cp.cadastral_ref =
+                        up.cadastral_ref
+
+                    WHERE up.user_id =
+                        CAST(
+                        :user_id
+                        AS uuid
+                        )
+
+                      AND up.cadastral_ref =
+                        :rc
                     """
                 ),
                 {
-                    "user_id": user_id,
-                    "rc": actual_rc,
+                    "user_id":
+                        user_id,
+
+                    "rc":
+                        actual_rc,
                 },
             ).mappings().one()
 
             return {
-                "parcel": _row_to_feature(
-                    saved_row,
-                    source="cadastral_cache",
-                )
+                "parcel":
+                    _row_to_feature(
+                        saved_row,
+                        source=(
+                            "cadastral_cache"
+                        ),
+                    )
             }
 
     # ---------------------------------------------------------
@@ -1394,61 +2404,94 @@ async def lookup_parcel(
         raise HTTPException(
             status_code=503,
             detail=(
-                "Catastro está bloqueado temporalmente por rate-limit. "
-                f"Reintenta en ~{remaining_seconds()}s. "
+                "Catastro está bloqueado "
+                "temporalmente por rate-limit. "
+                f"Reintenta en "
+                f"~{remaining_seconds()}s. "
                 f"Motivo: {deny_reason()}"
             ),
         )
 
     try:
-        xml_text, _srs_used = await fetch_parcel_gml(rc14)
+        xml_text, _srs_used = (
+            await fetch_parcel_gml(
+                rc14
+            )
+        )
 
     except Exception as exc:
-        message = str(exc) or repr(exc)
+        message = (
+                str(exc)
+                or repr(exc)
+        )
 
-        if _catastro_error_is_rate_limit(message):
+        if _catastro_error_is_rate_limit(
+                message
+        ):
             deny_for(
                 60 * 60,
-                "Límite de peticiones por hora (Catastro)",
+                (
+                    "Límite de peticiones "
+                    "por hora (Catastro)"
+                ),
                 )
 
             raise HTTPException(
                 status_code=503,
                 detail=(
-                    "Catastro ha denegado la petición por límite horario. "
-                    "Las llamadas externas quedan pausadas durante "
-                    "60 minutos."
+                    "Catastro ha denegado la "
+                    "petición por límite horario. "
+                    "Las llamadas externas quedan "
+                    "pausadas durante 60 minutos."
                 ),
             ) from exc
 
         raise HTTPException(
             status_code=502,
-            detail=f"Error llamando WFS Catastro: {type(exc).__name__}: {message}",
+            detail=(
+                "Error llamando WFS Catastro: "
+                f"{type(exc).__name__}: "
+                f"{message}"
+            ),
         ) from exc
 
     # ---------------------------------------------------------
-    # 4. Convert official GML to GeoJSON
+    # 4. Convert official GML to GeoJSON.
     # ---------------------------------------------------------
 
     try:
-        feature = gml_text_to_geojson_feature(xml_text)
+        feature = (
+            gml_text_to_geojson_feature(
+                xml_text
+            )
+        )
 
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Error convirtiendo GML a GeoJSON: {exc}",
+            detail=(
+                "Error convirtiendo GML "
+                f"a GeoJSON: {exc}"
+            ),
         ) from exc
 
-    if not feature.get("geometry"):
+    if not feature.get(
+            "geometry"
+    ):
         raise HTTPException(
             status_code=502,
-            detail="Catastro devolvió una parcela sin geometría",
+            detail=(
+                "Catastro devolvió una "
+                "parcela sin geometría"
+            ),
         )
 
-    geom_json = json.dumps(feature["geometry"])
+    geom_json = json.dumps(
+        feature["geometry"]
+    )
 
     # ---------------------------------------------------------
-    # 5. Store shared cadastral geometry
+    # 5. Store shared cadastral geometry.
     # ---------------------------------------------------------
 
     with engine.begin() as conn:
@@ -1462,34 +2505,50 @@ async def lookup_parcel(
                     created_at,
                     updated_at
                 )
+
                 VALUES (
                            :rc,
+
                            ST_Multi(
                                    ST_SetSRID(
-                                           ST_GeomFromGeoJSON(:geom),
+                                           ST_GeomFromGeoJSON(
+                                                   :geom
+                                           ),
                                            4326
                                    )
                            ),
+
                            NOW(),
                            NOW(),
                            NOW()
                        )
-                    ON CONFLICT (cadastral_ref)
-                DO UPDATE
-                                           SET
-                                               geom_official = EXCLUDED.geom_official,
-                                           last_fetched_at = NOW(),
-                                           updated_at = NOW()
+
+                    ON CONFLICT (
+                    cadastral_ref
+                )
+
+                DO UPDATE SET
+                    geom_official =
+                                           EXCLUDED.geom_official,
+
+                                           last_fetched_at =
+                                           NOW(),
+
+                                           updated_at =
+                                           NOW()
                 """
             ),
             {
-                "rc": rc,
-                "geom": geom_json,
+                "rc":
+                    rc,
+
+                "geom":
+                    geom_json,
             },
         )
 
         # -----------------------------------------------------
-        # 6. Save this parcel for the authenticated user
+        # 6. Save this parcel for authenticated user.
         # -----------------------------------------------------
 
         conn.execute(
@@ -1503,29 +2562,42 @@ async def lookup_parcel(
                     created_at,
                     updated_at
                 )
+
                 VALUES (
-                           CAST(:user_id AS uuid),
+                           CAST(
+                                   :user_id
+                               AS uuid
+                           ),
+
                            :rc,
                            :color,
                            FALSE,
                            NOW(),
                            NOW()
                        )
+
                     ON CONFLICT (
                     user_id,
                     cadastral_ref
-                ) DO NOTHING
+                )
+
+                DO NOTHING
                 """
             ),
             {
-                "user_id": user_id,
-                "rc": rc,
-                "color": DEFAULT_COLOR,
+                "user_id":
+                    user_id,
+
+                "rc":
+                    rc,
+
+                "color":
+                    DEFAULT_COLOR,
             },
         )
 
         # -----------------------------------------------------
-        # 7. Return combined cadastral + user data
+        # 7. Return combined cadastral + user data.
         # -----------------------------------------------------
 
         saved_row = conn.execute(
@@ -1538,48 +2610,85 @@ async def lookup_parcel(
                     up.color,
                     up.group_id,
                     up.is_deleted,
-                    ST_AsGeoJSON(cp.geom_official) AS geom,
+
+                    ST_AsGeoJSON(
+                            cp.geom_official
+                    ) AS geom,
+
                     ST_Area(
-                            cp.geom_official::geography
-                    )::double precision AS area_m2,
+                            cp.geom_official
+                                ::geography
+                    )::double precision
+                        AS area_m2,
+
                     (
                         ST_Area(
-                            cp.geom_official::geography
+                            cp.geom_official
+                                ::geography
                         ) / 10000.0
-                    )::double precision AS area_ha,
+                    )::double precision
+                        AS area_ha,
+
                     ST_Perimeter(
-                        cp.geom_official::geography
-                    )::double precision AS perimeter_m
+                        cp.geom_official
+                            ::geography
+                    )::double precision
+                        AS perimeter_m
+
                 FROM user_parcels up
+
                     INNER JOIN cadastral_parcels cp
-                ON cp.cadastral_ref = up.cadastral_ref
-                WHERE up.user_id = CAST(:user_id AS uuid)
-                  AND up.cadastral_ref = :rc
+                ON cp.cadastral_ref =
+                    up.cadastral_ref
+
+                WHERE up.user_id =
+                    CAST(
+                    :user_id
+                    AS uuid
+                    )
+
+                  AND up.cadastral_ref =
+                    :rc
                 """
             ),
             {
-                "user_id": user_id,
-                "rc": rc,
+                "user_id":
+                    user_id,
+
+                "rc":
+                    rc,
             },
         ).mappings().one()
 
     return {
-        "parcel": _row_to_feature(
-            saved_row,
-            source="catastro_wfs_gml",
-        )
+        "parcel":
+            _row_to_feature(
+                saved_row,
+                source=(
+                    "catastro_wfs_gml"
+                ),
+            )
     }
+
+
+# -------------------------------------------------------------------------
+# List parcels
+# -------------------------------------------------------------------------
 
 
 @router.get("")
 def list_parcels(
-        include_deleted: bool = Query(False),
-        current_user: User = Depends(get_current_user),
+        include_deleted: bool = Query(
+            False
+        ),
+        current_user: User = Depends(
+            get_current_user
+        ),
 ) -> dict[str, Any]:
     with engine.begin() as conn:
         rows = conn.execute(
             text(
-                f"""
+                """
                 SELECT
                     up.cadastral_ref,
                     up.name,
@@ -1587,54 +2696,136 @@ def list_parcels(
                     up.color,
                     up.group_id,
                     up.is_deleted,
-                    ST_AsGeoJSON(cp.geom_official) AS geom,
-                    ST_Area(cp.geom_official::geography)::double precision AS area_m2,
-                    (ST_Area(cp.geom_official::geography) / 10000.0)::double precision AS area_ha,
-                    ST_Perimeter(cp.geom_official::geography)::double precision AS perimeter_m
+
+                    ST_AsGeoJSON(
+                            cp.geom_official
+                    ) AS geom,
+
+                    ST_Area(
+                            cp.geom_official
+                                ::geography
+                    )::double precision
+                        AS area_m2,
+
+                    (
+                        ST_Area(
+                            cp.geom_official
+                                ::geography
+                        ) / 10000.0
+                    )::double precision
+                        AS area_ha,
+
+                    ST_Perimeter(
+                        cp.geom_official
+                            ::geography
+                    )::double precision
+                        AS perimeter_m
+
                 FROM user_parcels up
-                INNER JOIN cadastral_parcels cp
-                    ON cp.cadastral_ref = up.cadastral_ref
-                WHERE up.user_id = CAST(:user_id AS uuid)
-                  AND (:include_deleted = TRUE OR up.is_deleted = FALSE)
-                ORDER BY up.updated_at DESC, up.cadastral_ref ASC
+
+                    INNER JOIN cadastral_parcels cp
+                ON cp.cadastral_ref =
+                    up.cadastral_ref
+
+                WHERE up.user_id =
+                    CAST(
+                    :user_id
+                    AS uuid
+                    )
+
+                  AND (
+                    :include_deleted = TRUE
+                   OR up.is_deleted = FALSE
+                    )
+
+                ORDER BY
+                    up.updated_at DESC,
+                    up.cadastral_ref ASC
                 """
             ),
             {
-                "user_id": str(current_user.id),
-                "include_deleted": include_deleted,
+                "user_id":
+                    str(
+                        current_user.id
+                    ),
+
+                "include_deleted":
+                    include_deleted,
             },
         ).mappings().all()
 
     return {
-        "type": "FeatureCollection",
-        "features": [_row_to_feature(row) for row in rows],
+        "type":
+            "FeatureCollection",
+
+        "features": [
+            _row_to_feature(
+                row
+            )
+            for row in rows
+        ],
     }
+
+
+# -------------------------------------------------------------------------
+# Update parcel
+# -------------------------------------------------------------------------
 
 
 @router.patch("/{rc}")
 def update_parcel(
         rc: str,
         payload: ParcelUpdateRequest,
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(
+            get_current_user
+        ),
 ) -> dict[str, bool]:
-    normalised_rc = _normalise_rc(rc)
+    normalised_rc = (
+        _normalise_rc(
+            rc
+        )
+    )
 
-    color = payload.color.strip().lower() if payload.color is not None else None
-    if color is not None and not COLOR_RE.fullmatch(color):
+    color = (
+        payload.color
+        .strip()
+        .lower()
+        if payload.color is not None
+        else None
+    )
+
+    if (
+            color is not None
+            and not COLOR_RE.fullmatch(
+        color
+    )
+    ):
         raise HTTPException(
             status_code=400,
-            detail="color debe tener formato #RRGGBB",
+            detail=(
+                "color debe tener formato "
+                "#RRGGBB"
+            ),
         )
 
-    group_id = payload.group_id
+    group_id = (
+        payload.group_id
+    )
 
     if group_id:
         try:
-            group_id = str(uuid.UUID(group_id))
+            group_id = str(
+                uuid.UUID(
+                    group_id
+                )
+            )
+
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,
-                detail="group_id inválido",
+                detail=(
+                    "group_id inválido"
+                ),
             ) from exc
 
     if group_id:
@@ -1643,25 +2834,54 @@ def update_parcel(
                 text(
                     """
                     SELECT 1
+
                     FROM parcel_groups
-                    WHERE id = CAST(:id AS uuid)
-                      AND user_id = CAST(:user_id AS uuid)
+
+                    WHERE id =
+                          CAST(
+                                  :id
+                              AS uuid
+                          )
+
+                      AND user_id =
+                          CAST(
+                                  :user_id
+                              AS uuid
+                          )
                     """
                 ),
                 {
-                    "id": group_id,
-                    "user_id": str(current_user.id),
+                    "id":
+                        group_id,
+
+                    "user_id":
+                        str(
+                            current_user.id
+                        ),
                 },
             ).scalar_one_or_none()
 
         if group_exists is None:
             raise HTTPException(
                 status_code=400,
-                detail="El grupo indicado no existe o no pertenece al usuario",
+                detail=(
+                    "El grupo indicado no "
+                    "existe o no pertenece "
+                    "al usuario"
+                ),
             )
 
-    name = payload.name.strip() if payload.name is not None else None
-    notes = payload.notes.strip() if payload.notes is not None else None
+    name = (
+        payload.name.strip()
+        if payload.name is not None
+        else None
+    )
+
+    notes = (
+        payload.notes.strip()
+        if payload.notes is not None
+        else None
+    )
 
     if notes == "":
         notes = None
@@ -1671,107 +2891,236 @@ def update_parcel(
             text(
                 """
                 UPDATE user_parcels
+
                 SET
                     name = CASE
-                               WHEN :name_is_set THEN :name
+                               WHEN :name_is_set
+                                   THEN :name
                                ELSE name
                         END,
 
                     notes = CASE
-                                WHEN :notes_is_set THEN :notes
+                                WHEN :notes_is_set
+                                    THEN :notes
                                 ELSE notes
                         END,
 
-                    color = COALESCE(:color, color),
+                    color =
+                        COALESCE(
+                                :color,
+                                color
+                        ),
 
                     group_id = CASE
                                    WHEN :group_id_is_set
-                                       THEN CAST(NULLIF(:group_id, '') AS uuid)
+                                       THEN CAST(
+                                           NULLIF(
+                                                   :group_id,
+                                                   ''
+                                           )
+                                       AS uuid
+                                            )
                                    ELSE group_id
                         END,
 
-                    is_deleted = COALESCE(:is_deleted, is_deleted),
+                    is_deleted =
+                        COALESCE(
+                                :is_deleted,
+                                is_deleted
+                        ),
 
                     deleted_at = CASE
-                                     WHEN COALESCE(:is_deleted, is_deleted) = TRUE
-                                         THEN COALESCE(deleted_at, NOW())
+                                     WHEN COALESCE(
+                                                  :is_deleted,
+                                                  is_deleted
+                                          ) = TRUE
+
+                                         THEN COALESCE(
+                                             deleted_at,
+                                             NOW()
+                                              )
+
                                      ELSE NULL
                         END,
 
-                    updated_at = NOW()
+                    updated_at =
+                        NOW()
 
-                WHERE user_id = CAST(:user_id AS uuid)
+                WHERE user_id =
+                      CAST(
+                              :user_id
+                          AS uuid
+                      )
+
                   AND (
-                    cadastral_ref = :rc
+                    cadastral_ref =
+                    :rc
+
                         OR (
-                        :allow_rc14_fallback = TRUE
-                            AND LEFT(cadastral_ref, 14) = :rc14
+                        :allow_rc14_fallback =
+                        TRUE
+
+                            AND LEFT(
+                            cadastral_ref,
+                            14
+                            ) =
+                            :rc14
                         )
                     )
                 """
             ),
             {
-                "user_id": str(current_user.id),
-                "rc": normalised_rc,
-                "rc14": normalised_rc[:14],
-                "allow_rc14_fallback": len(normalised_rc) == 14,
-                "name_is_set": "name" in payload.model_fields_set,
-                "name": name,
-                "notes_is_set": "notes" in payload.model_fields_set,
-                "notes": notes,
-                "color": color,
-                "group_id_is_set": "group_id" in payload.model_fields_set,
-                "group_id": group_id if group_id is not None else "",
-                "is_deleted": payload.is_deleted,
+                "user_id":
+                    str(
+                        current_user.id
+                    ),
+
+                "rc":
+                    normalised_rc,
+
+                "rc14":
+                    normalised_rc[:14],
+
+                "allow_rc14_fallback":
+                    len(
+                        normalised_rc
+                    ) == 14,
+
+                "name_is_set":
+                    (
+                            "name"
+                            in
+                            payload.model_fields_set
+                    ),
+
+                "name":
+                    name,
+
+                "notes_is_set":
+                    (
+                            "notes"
+                            in
+                            payload.model_fields_set
+                    ),
+
+                "notes":
+                    notes,
+
+                "color":
+                    color,
+
+                "group_id_is_set":
+                    (
+                            "group_id"
+                            in
+                            payload.model_fields_set
+                    ),
+
+                "group_id":
+                    (
+                        group_id
+                        if group_id
+                           is not None
+                        else ""
+                    ),
+
+                "is_deleted":
+                    payload.is_deleted,
             },
         )
 
     if result.rowcount == 0:
         raise HTTPException(
             status_code=404,
-            detail="Parcela no encontrada",
+            detail=(
+                "Parcela no encontrada"
+            ),
         )
 
-    return {"ok": True}
+    return {
+        "ok": True,
+    }
+
+
+# -------------------------------------------------------------------------
+# Delete parcel
+# -------------------------------------------------------------------------
+
 
 @router.delete("/{rc}")
 def soft_delete_parcel(
         rc: str,
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(
+            get_current_user
+        ),
 ) -> dict[str, bool]:
-    normalised_rc = _normalise_rc(rc)
+    normalised_rc = (
+        _normalise_rc(
+            rc
+        )
+    )
 
     with engine.begin() as conn:
         result = conn.execute(
             text(
                 """
                 UPDATE user_parcels
+
                 SET
                     is_deleted = TRUE,
                     deleted_at = NOW(),
                     updated_at = NOW()
-                WHERE user_id = CAST(:user_id AS uuid)
+
+                WHERE user_id =
+                      CAST(
+                              :user_id
+                          AS uuid
+                      )
+
                   AND (
-                    cadastral_ref = :rc
+                    cadastral_ref =
+                    :rc
+
                         OR (
-                        :allow_rc14_fallback = TRUE
-                            AND LEFT(cadastral_ref, 14) = :rc14
+                        :allow_rc14_fallback =
+                        TRUE
+
+                            AND LEFT(
+                            cadastral_ref,
+                            14
+                            ) =
+                            :rc14
                         )
                     )
                 """
             ),
             {
-                "user_id": str(current_user.id),
-                "rc": normalised_rc,
-                "rc14": normalised_rc[:14],
-                "allow_rc14_fallback": len(normalised_rc) == 14,
+                "user_id":
+                    str(
+                        current_user.id
+                    ),
+
+                "rc":
+                    normalised_rc,
+
+                "rc14":
+                    normalised_rc[:14],
+
+                "allow_rc14_fallback":
+                    len(
+                        normalised_rc
+                    ) == 14,
             },
         )
 
     if result.rowcount == 0:
         raise HTTPException(
             status_code=404,
-            detail="Parcela no encontrada",
+            detail=(
+                "Parcela no encontrada"
+            ),
         )
 
-    return {"ok": True}
+    return {
+        "ok": True,
+    }

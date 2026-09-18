@@ -586,6 +586,31 @@ export const cadastreApi = {
             );
         },
 
+        saveUnits(
+            cadastralRef: string,
+            cadastralRefs: string[],
+        ): Promise<{
+            ok: boolean;
+            parcel_ref: string;
+            saved_count: number;
+            cadastral_refs: string[];
+        }> {
+            const rc14 = cadastralRef
+                .replace(/\s+/g, "")
+                .toUpperCase()
+                .slice(0, 14);
+
+            return request(
+                `/parcels/${encodeURIComponent(rc14)}/units/save`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        cadastral_refs: cadastralRefs,
+                    }),
+                },
+            );
+        },
+
         async preview(
             cadastralRef: string,
         ): Promise<ParcelFeature> {

@@ -74,6 +74,7 @@ export default function CadastreApp() {
   const [savingPreview, setSavingPreview] = useState(false);
   const [previewParcel, setPreviewParcel] = useState<ParcelFeature | null>(null);
   const [previewUnits, setPreviewUnits] = useState<CadastralUnit[]>([]);
+  const [selectedUnitRefs, setSelectedUnitRefs] = useState<string[]>([]);
   const [previewAlreadySaved, setPreviewAlreadySaved] = useState(false);
 
   const [fieldMode, setFieldMode] = useState(false);
@@ -214,6 +215,7 @@ export default function CadastreApp() {
     setIdentifyLoading(false);
     setPreviewParcel(null);
     setPreviewUnits([]);
+    setSelectedUnitRefs([]);
     setPreviewAlreadySaved(false);
 
     /*
@@ -273,6 +275,7 @@ export default function CadastreApp() {
     setIdentifyLoading(false);
     setPreviewParcel(null);
     setPreviewUnits([]);
+    setSelectedUnitRefs([]);
     setPreviewAlreadySaved(false);
   };
 
@@ -290,6 +293,7 @@ export default function CadastreApp() {
     setIdentifyLoading(true);
     setPreviewParcel(null);
     setPreviewUnits([]);
+    setSelectedUnitRefs([]);
     setPreviewAlreadySaved(false);
     data.clearNotice();
 
@@ -353,6 +357,11 @@ export default function CadastreApp() {
 
         setPreviewParcel(mockParcel);
         setPreviewUnits(mockUnits);
+        setSelectedUnitRefs(
+            mockUnits.map(
+                (unit) => unit.cadastral_ref,
+            ),
+        );
         setPreviewAlreadySaved(false);
 
         return;
@@ -369,6 +378,11 @@ export default function CadastreApp() {
 
       setPreviewParcel(result.parcel);
       setPreviewUnits(result.units ?? []);
+      setSelectedUnitRefs(
+          (result.units ?? []).map(
+              (unit) => unit.cadastral_ref,
+          ),
+      );
       setPreviewAlreadySaved(result.already_saved);
 
     } catch (error) {
@@ -405,6 +419,7 @@ export default function CadastreApp() {
       setSelectedRc(saved.properties.cadastral_ref);
       setPreviewParcel(null);
       setPreviewUnits([]);
+      setSelectedUnitRefs([]);
       setPreviewAlreadySaved(false);
 
       mapRef.current?.fitParcel(saved);
@@ -437,6 +452,7 @@ export default function CadastreApp() {
       setSelectedRc(previewParcel.properties.cadastral_ref);
       setPreviewParcel(null);
       setPreviewUnits([]);
+      setSelectedUnitRefs([]);
       setPreviewAlreadySaved(false);
 
       mapRef.current?.fitParcel(previewParcel);
@@ -486,6 +502,34 @@ export default function CadastreApp() {
     fieldMode,
     selectedParcel?.properties.cadastral_ref,
   ]);
+
+  const togglePreviewUnit = (
+      cadastralRef: string,
+  ) => {
+    setSelectedUnitRefs((current) =>
+        current.includes(cadastralRef)
+            ? current.filter(
+                (value) => value !== cadastralRef,
+            )
+            : [...current, cadastralRef],
+    );
+  };
+
+  const toggleAllPreviewUnits = () => {
+    if (
+        selectedUnitRefs.length ===
+        previewUnits.length
+    ) {
+      setSelectedUnitRefs([]);
+      return;
+    }
+
+    setSelectedUnitRefs(
+        previewUnits.map(
+            (unit) => unit.cadastral_ref,
+        ),
+    );
+  };
 
   const appClassName = [
     "cad-app",
@@ -623,11 +667,14 @@ export default function CadastreApp() {
                     loading={identifyLoading || savingPreview}
                     preview={previewParcel}
                     units={previewUnits}
+                    selectedUnitRefs={selectedUnitRefs}
                     alreadySaved={previewAlreadySaved}
                     onStart={() => {}}
                     onCancel={cancelIdentify}
                     onSave={() => void savePreviewParcel()}
                     onOpenSaved={() => void openSavedPreview()}
+                    onToggleUnit={togglePreviewUnit}
+                    onToggleAllUnits={toggleAllPreviewUnits}
                 />
               </div>
           ) : null}
