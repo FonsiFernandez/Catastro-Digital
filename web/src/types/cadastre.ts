@@ -22,6 +22,7 @@ export type BaseMapId = "street" | "aerial" | "topographic";
 export type ParcelIdentification = {
   parcel: ParcelFeature;
   already_saved: boolean;
+  units?: CadastralUnit[];
 };
 
 export type ParcelGroup = {

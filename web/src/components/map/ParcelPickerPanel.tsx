@@ -5,12 +5,13 @@ import {
     MapPinIcon,
     PlusIcon,
 } from "@/components/ui/Icons";
-import type { ParcelFeature } from "@/types/cadastre";
+import type {CadastralUnit, ParcelFeature} from "@/types/cadastre";
 
 export function ParcelPickerPanel({
                                       active,
                                       loading,
                                       preview,
+                                      units,
                                       alreadySaved,
                                       onStart,
                                       onCancel,
@@ -20,6 +21,7 @@ export function ParcelPickerPanel({
     active: boolean;
     loading: boolean;
     preview: ParcelFeature | null;
+    units: CadastralUnit[];
     alreadySaved: boolean;
     onStart: () => void;
     onCancel: () => void;
@@ -119,6 +121,56 @@ export function ParcelPickerPanel({
                     ? "Esta parcela ya está guardada en Catastro Digital."
                     : "Comprueba el contorno resaltado antes de guardarla."}
             </p>
+
+            {units.length > 1 ? (
+                <div className="picker-units">
+                    <div className="picker-units-head">
+                        <strong>
+                            {units.length} inmuebles en esta parcela
+                        </strong>
+
+                        <span>
+                Referencias catastrales asociadas
+            </span>
+                    </div>
+
+                    <div className="picker-units-list">
+                        {units.map((unit) => (
+                            <div
+                                key={unit.cadastral_ref}
+                                className="picker-unit"
+                            >
+                                <div>
+                                    <strong>
+                                        {unit.floor || unit.door
+                                            ? [
+                                                unit.floor
+                                                    ? `Planta ${unit.floor}`
+                                                    : null,
+                                                unit.door
+                                                    ? `Puerta ${unit.door}`
+                                                    : null,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" · ")
+                                            : unit.use ?? "Inmueble"}
+                                    </strong>
+
+                                    <span>
+                            {unit.cadastral_ref}
+                        </span>
+                                </div>
+
+                                {unit.built_area_m2 != null ? (
+                                    <span className="picker-unit-area">
+                            {unit.built_area_m2} m²
+                        </span>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
 
             <div className="picker-actions">
                 <button

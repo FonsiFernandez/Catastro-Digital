@@ -4,6 +4,7 @@ import json
 import re
 import uuid
 from typing import Any
+import httpx
 
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field
@@ -16,6 +17,7 @@ from app.services.catastro_wfs import fetch_parcel_gml, fetch_parcels_around_poi
 from app.services.gml_to_geojson import gml_text_to_geojson_feature, gml_text_to_geojson_features
 from app.auth.dependencies import get_current_user
 from app.models import User
+from app.services.catastro_properties import fetch_cadastral_units
 
 router = APIRouter(prefix="/parcels", tags=["parcels"])
 
@@ -128,6 +130,162 @@ def _parcel_metrics_sql() -> str:
         (ST_Area(geom_official::geography) / 10000.0)::double precision AS area_ha,
         ST_Perimeter(geom_official::geography)::double precision AS perimeter_m
     """
+
+@router.get("/{rc}/units")
+async def get_cadastral_units(
+        rc: str,
+) -> dict[str, Any]:
+    """
+    Return all cadastral properties belonging to the same physical parcel.
+
+    The physical parcel is identified by the first 14 characters of the
+    cadastral reference.
+    """
+
+    normalised_rc = _normalise_rc(rc)
+    rc14 = normalised_rc[:14]
+
+    # ---------------------------------------------------------
+    # 1. Check local cadastral cache first.
+    # ---------------------------------------------------------
+
+    with engine.begin() as conn:
+        cached_rows = conn.execute(
+            text(
+                """
+                SELECT
+                    cadastral_ref,
+                    parcel_ref,
+                    use,
+                    address,
+                    floor,
+                    door,
+                    built_area_m2
+                FROM cadastral_units
+                WHERE parcel_ref = :parcel_ref
+                ORDER BY cadastral_ref ASC
+                """
+            ),
+            {
+                "parcel_ref": rc14,
+            },
+        ).mappings().all()
+
+    if cached_rows:
+        units = [
+            {
+                "cadastral_ref": row["cadastral_ref"],
+                "parcel_ref": row["parcel_ref"],
+                "use": row["use"],
+                "address": row["address"],
+                "floor": row["floor"],
+                "door": row["door"],
+                "built_area_m2": _metric(
+                    row["built_area_m2"]
+                ),
+            }
+            for row in cached_rows
+        ]
+
+        return {
+            "parcel_ref": rc14,
+            "count": len(units),
+            "units": units,
+            "source": "cadastral_units_cache",
+        }
+
+    # ---------------------------------------------------------
+    # 2. Nothing cached. Ask Catastro.
+    # ---------------------------------------------------------
+
+    try:
+        units = await fetch_cadastral_units(
+            rc14
+        )
+
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Catastro rechazó la consulta de inmuebles: "
+                f"HTTP {exc.response.status_code}"
+            ),
+        ) from exc
+
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "No se pudo conectar con el servicio "
+                f"de inmuebles del Catastro: {exc}"
+            ),
+        ) from exc
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Error consultando los inmuebles "
+                f"asociados a la parcela: {exc}"
+            ),
+        ) from exc
+
+    # ---------------------------------------------------------
+    # 3. Store public cadastral information.
+    # ---------------------------------------------------------
+
+    if units:
+        with engine.begin() as conn:
+            for unit in units:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO cadastral_units (
+                            cadastral_ref,
+                            parcel_ref,
+                            use,
+                            address,
+                            floor,
+                            door,
+                            built_area_m2,
+                            last_fetched_at,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (
+                                   :cadastral_ref,
+                                   :parcel_ref,
+                                   :use,
+                                   :address,
+                                   :floor,
+                                   :door,
+                                   :built_area_m2,
+                                   NOW(),
+                                   NOW(),
+                                   NOW()
+                               )
+                            ON CONFLICT (cadastral_ref)
+                        DO UPDATE
+                                                           SET
+                                                               parcel_ref = EXCLUDED.parcel_ref,
+                                                           use = EXCLUDED.use,
+                                                           address = EXCLUDED.address,
+                                                           floor = EXCLUDED.floor,
+                                                           door = EXCLUDED.door,
+                                                           built_area_m2 = EXCLUDED.built_area_m2,
+                                                           last_fetched_at = NOW(),
+                                                           updated_at = NOW()
+                        """
+                    ),
+                    unit,
+                )
+
+    return {
+        "parcel_ref": rc14,
+        "count": len(units),
+        "units": units,
+        "source": "catastro_dnprc",
+    }
 
 @router.post("/preview")
 async def preview_parcel(

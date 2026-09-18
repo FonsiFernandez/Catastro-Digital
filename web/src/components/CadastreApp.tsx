@@ -14,10 +14,12 @@ import { useCadastreData } from "@/hooks/useCadastreData";
 import { useFieldLocation } from "@/hooks/useFieldLocation";
 import { readableApiError } from "@/lib/api";
 import { formatHectares } from "@/lib/format";
-import type { BaseMapId, FieldTarget, ParcelFeature } from "@/types/cadastre";
+import type { BaseMapId, FieldTarget, ParcelFeature, CadastralUnit } from "@/types/cadastre";
 
 const RC_RE = /^[0-9A-Z]{14,20}$/;
 const BASE_MAPS: BaseMapId[] = ["street", "aerial", "topographic"];
+const USE_MOCK_CADASTRE =
+    process.env.NEXT_PUBLIC_USE_MOCK_CADASTRE === "true";
 
 function useStoredBoolean(key: string, initialValue: boolean) {
   const [value, setValue] = useState(initialValue);
@@ -71,6 +73,7 @@ export default function CadastreApp() {
   const [identifyLoading, setIdentifyLoading] = useState(false);
   const [savingPreview, setSavingPreview] = useState(false);
   const [previewParcel, setPreviewParcel] = useState<ParcelFeature | null>(null);
+  const [previewUnits, setPreviewUnits] = useState<CadastralUnit[]>([]);
   const [previewAlreadySaved, setPreviewAlreadySaved] = useState(false);
 
   const [fieldMode, setFieldMode] = useState(false);
@@ -210,6 +213,7 @@ export default function CadastreApp() {
     identifyRequestIdRef.current += 1;
     setIdentifyLoading(false);
     setPreviewParcel(null);
+    setPreviewUnits([]);
     setPreviewAlreadySaved(false);
 
     /*
@@ -268,6 +272,7 @@ export default function CadastreApp() {
     identifyRequestIdRef.current += 1;
     setIdentifyLoading(false);
     setPreviewParcel(null);
+    setPreviewUnits([]);
     setPreviewAlreadySaved(false);
   };
 
@@ -284,10 +289,75 @@ export default function CadastreApp() {
 
     setIdentifyLoading(true);
     setPreviewParcel(null);
+    setPreviewUnits([]);
     setPreviewAlreadySaved(false);
     data.clearNotice();
 
     try {
+      if (USE_MOCK_CADASTRE) {
+        const mockParcel: ParcelFeature = {
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: [[
+              [-3.70395, 40.41695],
+              [-3.70355, 40.41695],
+              [-3.70355, 40.41665],
+              [-3.70395, 40.41665],
+              [-3.70395, 40.41695],
+            ]],
+          },
+          properties: {
+            cadastral_ref: "1234567AB1234C",
+            name: null,
+            notes: null,
+            color: "#f59e0b",
+            group_id: null,
+            is_deleted: false,
+            area_m2: 950,
+            area_ha: 0.095,
+            perimeter_m: 125,
+            source: "mock",
+          },
+        };
+
+        const mockUnits: CadastralUnit[] = [
+          {
+            cadastral_ref: "1234567AB1234C0001AA",
+            parcel_ref: "1234567AB1234C",
+            use: "Vivienda",
+            address: "CALLE MAYOR 10 01 A",
+            floor: "01",
+            door: "A",
+            built_area_m2: 82,
+          },
+          {
+            cadastral_ref: "1234567AB1234C0002BB",
+            parcel_ref: "1234567AB1234C",
+            use: "Vivienda",
+            address: "CALLE MAYOR 10 01 B",
+            floor: "01",
+            door: "B",
+            built_area_m2: 78,
+          },
+          {
+            cadastral_ref: "1234567AB1234C0003CC",
+            parcel_ref: "1234567AB1234C",
+            use: "Local comercial",
+            address: "CALLE MAYOR 10 BJ",
+            floor: "BJ",
+            door: null,
+            built_area_m2: 115,
+          },
+        ];
+
+        setPreviewParcel(mockParcel);
+        setPreviewUnits(mockUnits);
+        setPreviewAlreadySaved(false);
+
+        return;
+      }
+
       const result = await data.identifyParcel(
           longitude,
           latitude,
@@ -298,7 +368,9 @@ export default function CadastreApp() {
       }
 
       setPreviewParcel(result.parcel);
+      setPreviewUnits(result.units ?? []);
       setPreviewAlreadySaved(result.already_saved);
+
     } catch (error) {
       if (identifyRequestIdRef.current !== requestId) {
         return;
@@ -332,6 +404,7 @@ export default function CadastreApp() {
 
       setSelectedRc(saved.properties.cadastral_ref);
       setPreviewParcel(null);
+      setPreviewUnits([]);
       setPreviewAlreadySaved(false);
 
       mapRef.current?.fitParcel(saved);
@@ -363,6 +436,7 @@ export default function CadastreApp() {
 
       setSelectedRc(previewParcel.properties.cadastral_ref);
       setPreviewParcel(null);
+      setPreviewUnits([]);
       setPreviewAlreadySaved(false);
 
       mapRef.current?.fitParcel(previewParcel);
@@ -548,6 +622,7 @@ export default function CadastreApp() {
                     active
                     loading={identifyLoading || savingPreview}
                     preview={previewParcel}
+                    units={previewUnits}
                     alreadySaved={previewAlreadySaved}
                     onStart={() => {}}
                     onCancel={cancelIdentify}
