@@ -103,3 +103,19 @@ export type DeviceLocation = {
   speed: number | null;
   timestamp: number;
 };
+
+export type CadastralUnit = {
+  cadastral_ref: string;
+  parcel_ref: string;
+  use: string | null;
+  address: string | null;
+  floor: string | null;
+  door: string | null;
+  built_area_m2: number | null;
+};
+
+export type ParcelUnitsResult = {
+  parcel_ref: string;
+  count: number;
+  units: CadastralUnit[];
+};
