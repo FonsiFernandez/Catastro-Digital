@@ -354,17 +354,47 @@ export function useCadastreData(
           longitude: number,
           latitude: number,
       ) => {
-        if (authenticated) {
-          return cadastreApi.parcels.identify(
-              longitude,
-              latitude,
-          );
-        }
+        const result = authenticated
+            ? await cadastreApi.parcels.identify(
+                longitude,
+                latitude,
+            )
+            : await cadastreApi.parcels.previewIdentify(
+                longitude,
+                latitude,
+            );
 
-        return cadastreApi.parcels.previewIdentify(
-            longitude,
-            latitude,
-        );
+        const cadastralRef =
+            result.parcel.properties.cadastral_ref;
+
+        try {
+          const unitsResult =
+              await cadastreApi.parcels.units(
+                  cadastralRef,
+              );
+
+          return {
+            ...result,
+            units: unitsResult.units,
+          };
+        } catch (error) {
+          /*
+           * Identifying the parcel is still useful even if
+           * Catastro's alphanumeric service is unavailable.
+           *
+           * Do not make parcel identification fail only because
+           * the associated-property lookup failed.
+           */
+          console.warn(
+              "No se pudieron cargar los inmuebles asociados:",
+              error,
+          );
+
+          return {
+            ...result,
+            units: [],
+          };
+        }
       },
       [authenticated],
   );

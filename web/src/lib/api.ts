@@ -9,6 +9,7 @@ import type {
     ParcelIdentification,
     ParcelGroup,
     ParcelUpdate,
+    ParcelUnitsResult,
 } from "@/types/cadastre";
 
 const API_BASE = "/api";
@@ -507,6 +508,19 @@ export const cadastreApi = {
                         latitude,
                     }),
                 },
+            );
+        },
+
+        units(
+            cadastralRef: string,
+        ): Promise<ParcelUnitsResult> {
+            const rc14 = cadastralRef
+                .replace(/\s+/g, "")
+                .toUpperCase()
+                .slice(0, 14);
+
+            return request<ParcelUnitsResult>(
+                `/parcels/${encodeURIComponent(rc14)}/units`,
             );
         },
 
