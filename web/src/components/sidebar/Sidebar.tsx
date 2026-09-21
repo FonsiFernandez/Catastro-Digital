@@ -785,6 +785,7 @@ export function Sidebar({
                     <ParcelInspector
                         parcel={selectedParcel}
                         groups={groups}
+                        isGuest={isGuest}
                         onClose={
                             onCloseInspector
                         }
@@ -1553,6 +1554,7 @@ export function Sidebar({
                                 selectedParcel
                             }
                             groups={groups}
+                            isGuest={isGuest}
                             onClose={
                                 onCloseInspector
                             }

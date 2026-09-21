@@ -2642,9 +2642,10 @@ svg {
   }
 
   .sidebar-desktop .parcel-inspector {
-    flex: 0 0 auto;
+    min-height: 0;
+    flex: 1 1 auto;
 
-    max-height: 55vh;
+    max-height: none;
 
     overflow-x: hidden;
     overflow-y: auto;

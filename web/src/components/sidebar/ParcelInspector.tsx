@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   CloseIcon,
@@ -11,16 +11,24 @@ import {
   TrashIcon,
 } from "@/components/ui/Icons";
 import {
+  cadastreApi,
+  readableApiError,
+} from "@/lib/api";
+import {
   formatDistance,
   formatHectares,
   formatNumber,
 } from "@/lib/format";
+import { guestDb } from "@/lib/guestDb";
 import { DEFAULT_PARCEL_COLOR } from "@/lib/map";
 import type {
+  CadastralUnit,
   ParcelFeature,
   ParcelGroup,
   ParcelUpdate,
 } from "@/types/cadastre";
+
+import unitStyles from "./ParcelInspectorUnits.module.css";
 
 function BackIcon() {
   return (
@@ -67,9 +75,516 @@ function AreaIcon() {
   );
 }
 
+function unitTitle(
+    unit: CadastralUnit,
+): string {
+  const position = [
+    unit.floor
+        ? `Planta ${unit.floor}`
+        : null,
+    unit.door
+        ? `Puerta ${unit.door}`
+        : null,
+  ]
+      .filter(Boolean)
+      .join(" · ");
+
+  return (
+      position ||
+      unit.use ||
+      "Inmueble"
+  );
+}
+
+function mergeUnits(
+    available: CadastralUnit[],
+    selected: CadastralUnit[],
+): CadastralUnit[] {
+  const byRef =
+      new Map<string, CadastralUnit>();
+
+  for (const unit of available) {
+    byRef.set(
+        unit.cadastral_ref,
+        unit,
+    );
+  }
+
+  /*
+   * Keep already-saved units visible even if Catastro's
+   * alphanumeric service is temporarily unavailable.
+   */
+  for (const unit of selected) {
+    if (
+        !byRef.has(
+            unit.cadastral_ref,
+        )
+    ) {
+      byRef.set(
+          unit.cadastral_ref,
+          unit,
+      );
+    }
+  }
+
+  return Array.from(
+      byRef.values(),
+  ).sort((a, b) =>
+      a.cadastral_ref.localeCompare(
+          b.cadastral_ref,
+          "es",
+      ),
+  );
+}
+
+function sameSelection(
+    a: string[],
+    b: string[],
+): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  const left =
+      [...a].sort();
+
+  const right =
+      [...b].sort();
+
+  return left.every(
+      (value, index) =>
+          value === right[index],
+  );
+}
+
+function ParcelUnitsEditor({
+                             cadastralRef,
+                             isGuest,
+                             isDeleted,
+                           }: {
+  cadastralRef: string;
+  isGuest: boolean;
+  isDeleted: boolean;
+}) {
+  const [units, setUnits] =
+      useState<CadastralUnit[]>([]);
+
+  const [
+    selectedRefs,
+    setSelectedRefs,
+  ] = useState<string[]>([]);
+
+  const [
+    savedSelectedRefs,
+    setSavedSelectedRefs,
+  ] = useState<string[]>([]);
+
+  const [loading, setLoading] =
+      useState(true);
+
+  const [saving, setSaving] =
+      useState(false);
+
+  const [
+    loadWarning,
+    setLoadWarning,
+  ] = useState<string | null>(null);
+
+  const [
+    saveMessage,
+    setSaveMessage,
+  ] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load =
+        async () => {
+          setLoading(true);
+          setLoadWarning(null);
+          setSaveMessage(null);
+          setUnits([]);
+          setSelectedRefs([]);
+          setSavedSelectedRefs([]);
+
+          let selected:
+              CadastralUnit[] = [];
+
+          try {
+            selected = isGuest
+                ? await guestDb.listUnits(
+                    cadastralRef,
+                )
+                : (
+                    await cadastreApi.parcels
+                        .selectedUnits(
+                            cadastralRef,
+                        )
+                ).units;
+          } catch (error) {
+            if (cancelled) {
+              return;
+            }
+
+            setLoadWarning(
+                readableApiError(
+                    error,
+                    "No se pudo cargar la selección de inmuebles guardada",
+                ),
+            );
+          }
+
+          let available:
+              CadastralUnit[] = [];
+
+          try {
+            available = (
+                await cadastreApi.parcels
+                    .units(
+                        cadastralRef,
+                    )
+            ).units;
+          } catch (error) {
+            if (cancelled) {
+              return;
+            }
+
+            /*
+             * Saved units are still useful if Catastro
+             * cannot refresh the full unit catalogue.
+             */
+            if (selected.length > 0) {
+              setLoadWarning(
+                  "No se pudo actualizar la lista completa desde Catastro. " +
+                  "Se muestran los inmuebles que ya estaban guardados.",
+              );
+            } else {
+              setLoadWarning(
+                  readableApiError(
+                      error,
+                      "No se pudieron cargar los inmuebles asociados",
+                  ),
+              );
+            }
+          }
+
+          if (cancelled) {
+            return;
+          }
+
+          const merged =
+              mergeUnits(
+                  available,
+                  selected,
+              );
+
+          const selectedIds =
+              selected.map(
+                  (unit) =>
+                      unit.cadastral_ref,
+              );
+
+          setUnits(merged);
+          setSelectedRefs(
+              selectedIds,
+          );
+          setSavedSelectedRefs(
+              selectedIds,
+          );
+          setLoading(false);
+        };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cadastralRef,
+    isGuest,
+  ]);
+
+  const hasChanges =
+      useMemo(
+          () =>
+              !sameSelection(
+                  selectedRefs,
+                  savedSelectedRefs,
+              ),
+          [
+            savedSelectedRefs,
+            selectedRefs,
+          ],
+      );
+
+  const toggleUnit = (
+      cadastralUnitRef: string,
+  ) => {
+    if (
+        isDeleted ||
+        saving
+    ) {
+      return;
+    }
+
+    setSaveMessage(null);
+
+    setSelectedRefs(
+        (current) =>
+            current.includes(
+                cadastralUnitRef,
+            )
+                ? current.filter(
+                    (value) =>
+                        value !==
+                        cadastralUnitRef,
+                )
+                : [
+                  ...current,
+                  cadastralUnitRef,
+                ],
+    );
+  };
+
+  const save = async () => {
+    if (
+        saving ||
+        isDeleted ||
+        !hasChanges
+    ) {
+      return;
+    }
+
+    const selectedUnits =
+        units.filter(
+            (unit) =>
+                selectedRefs.includes(
+                    unit.cadastral_ref,
+                ),
+        );
+
+    setSaving(true);
+    setSaveMessage(null);
+
+    try {
+      if (isGuest) {
+        await guestDb.replaceUnits(
+            cadastralRef,
+            selectedUnits,
+        );
+      } else {
+        await cadastreApi.parcels
+            .saveUnitSelection(
+                cadastralRef,
+                selectedUnits,
+            );
+      }
+
+      setSavedSelectedRefs(
+          [...selectedRefs],
+      );
+
+      setSaveMessage(
+          selectedUnits.length === 0
+              ? "Todos los inmuebles se han quitado de esta parcela."
+              : "Selección de inmuebles guardada.",
+      );
+    } catch (error) {
+      setSaveMessage(
+          readableApiError(
+              error,
+              "No se pudieron guardar los cambios de inmuebles",
+          ),
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedCount =
+      selectedRefs.length;
+
+  /*
+   * Keep the section visible while loading or if an error happened.
+   * If Catastro confirms that there are no units at all, there is
+   * nothing useful to display in the parcel detail.
+   */
+  if (
+      !loading &&
+      units.length === 0 &&
+      !loadWarning
+  ) {
+    return null;
+  }
+
+  return (
+      <section
+          className={unitStyles.section}
+          aria-label="Inmuebles asociados"
+      >
+        <div className={unitStyles.header}>
+          <div className={unitStyles.headerCopy}>
+            <strong>
+              Inmuebles asociados
+            </strong>
+
+            <span>
+              Puedes cambiar qué referencias
+              forman parte de esta parcela guardada.
+            </span>
+          </div>
+
+          {!loading ? (
+              <span className={unitStyles.count}>
+                {selectedCount}/{units.length}
+              </span>
+          ) : null}
+        </div>
+
+        {loadWarning ? (
+            <div
+                className={`${unitStyles.state} ${unitStyles.warning}`}
+                role="status"
+            >
+              {loadWarning}
+            </div>
+        ) : null}
+
+        {loading ? (
+            <div className={unitStyles.state}>
+              Cargando inmuebles…
+            </div>
+        ) : units.length > 0 ? (
+            <>
+              <div className={unitStyles.list}>
+                {units.map((unit) => {
+                  const checked =
+                      selectedRefs.includes(
+                          unit.cadastral_ref,
+                      );
+
+                  return (
+                      <label
+                          key={
+                            unit.cadastral_ref
+                          }
+                          className={
+                            unitStyles.unit
+                          }
+                      >
+                        <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={
+                              isDeleted ||
+                              saving
+                            }
+                            onChange={() =>
+                                toggleUnit(
+                                    unit.cadastral_ref,
+                                )
+                            }
+                        />
+
+                        <span
+                            className={
+                              unitStyles.unitCopy
+                            }
+                        >
+                          <strong>
+                            {unitTitle(unit)}
+                          </strong>
+
+                          <code>
+                            {unit.cadastral_ref}
+                          </code>
+
+                          {unit.address ? (
+                              <span>
+                                {unit.address}
+                              </span>
+                          ) : null}
+
+                          {unit.use &&
+                          unitTitle(unit) !==
+                          unit.use ? (
+                              <span>
+                                {unit.use}
+                              </span>
+                          ) : null}
+                        </span>
+
+                        {unit.built_area_m2 != null ? (
+                            <span
+                                className={
+                                  unitStyles.area
+                                }
+                            >
+                              {formatNumber(
+                                  unit.built_area_m2,
+                                  0,
+                              )}{" "}
+                              m²
+                            </span>
+                        ) : null}
+                      </label>
+                  );
+                })}
+              </div>
+
+              <div className={unitStyles.actions}>
+                <span
+                    className={
+                      unitStyles.actionsCopy
+                    }
+                >
+                  {isDeleted
+                      ? "Restaura la parcela para editar sus inmuebles."
+                      : selectedCount === 0
+                          ? "La parcela se conservará aunque no tenga inmuebles seleccionados."
+                          : `${selectedCount} ${selectedCount === 1 ? "inmueble seleccionado" : "inmuebles seleccionados"}`}
+                </span>
+
+                <button
+                    type="button"
+                    className={`secondary-button ${unitStyles.saveButton}`}
+                    disabled={
+                      isDeleted ||
+                      saving ||
+                      !hasChanges
+                    }
+                    onClick={() =>
+                        void save()
+                    }
+                >
+                  {saving
+                      ? "Guardando…"
+                      : "Guardar cambios"}
+                </button>
+              </div>
+
+              {saveMessage ? (
+                  <div
+                      className={`${unitStyles.state} ${unitStyles.success}`}
+                      role="status"
+                  >
+                    {saveMessage}
+                  </div>
+              ) : null}
+            </>
+        ) : (
+            <div className={unitStyles.state}>
+              No hay inmuebles disponibles para esta parcela.
+            </div>
+        )}
+      </section>
+  );
+}
+
 export function ParcelInspector({
                                   parcel,
                                   groups,
+                                  isGuest,
                                   onClose,
                                   onCenter,
                                   onUpdate,
@@ -77,6 +592,7 @@ export function ParcelInspector({
                                 }: {
   parcel: ParcelFeature;
   groups: ParcelGroup[];
+  isGuest: boolean;
   onClose: () => void;
   onCenter: () => void;
   onUpdate: (
@@ -84,114 +600,135 @@ export function ParcelInspector({
   ) => Promise<unknown>;
   onDelete: () => Promise<unknown>;
 }) {
-  const props = parcel.properties;
+  const props =
+      parcel.properties;
 
   const [name, setName] =
-      useState(props.name ?? "");
+      useState(
+          props.name ?? "",
+      );
 
   const [notes, setNotes] =
-      useState(props.notes ?? "");
+      useState(
+          props.notes ?? "",
+      );
 
   const [copied, setCopied] =
       useState(false);
 
-
   const groupName =
       groups.find(
           (group) =>
-              group.id === props.group_id,
-      )?.name ?? "Sin grupo";
+              group.id ===
+              props.group_id,
+      )?.name ??
+      "Sin grupo";
 
   useEffect(() => {
-    setName(props.name ?? "");
-    setNotes(props.notes ?? "");
+    setName(
+        props.name ?? "",
+    );
+
+    setNotes(
+        props.notes ?? "",
+    );
   }, [
     props.cadastral_ref,
     props.name,
     props.notes,
   ]);
 
-  const saveName = async () => {
-    const next = name.trim();
+  const saveName =
+      async () => {
+        const next =
+            name.trim();
 
-    if (
-        next ===
-        (props.name ?? "")
-    ) {
-      return;
-    }
-
-    await onUpdate({
-      name: next,
-    });
-  };
-
-  const saveNotes = async () => {
-    const next = notes.trim();
-
-    if (
-        next ===
-        (props.notes ?? "")
-    ) {
-      return;
-    }
-
-    await onUpdate({
-      notes: next,
-    });
-  };
-
-  const copyReference = async () => {
-    await navigator.clipboard.writeText(
-        props.cadastral_ref,
-    );
-
-    setCopied(true);
-
-    window.setTimeout(
-        () => setCopied(false),
-        1500,
-    );
-  };
-
-  const shareParcel = async () => {
-    const title =
-        props.name?.trim() ||
-        "Parcela";
-
-    const text =
-        `${title}\nReferencia catastral: ${props.cadastral_ref}`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title:
-              `${title} · Catastro Digital`,
-          text,
-        });
-
-        return;
-      } catch (error) {
         if (
-            error instanceof DOMException &&
-            error.name === "AbortError"
+            next ===
+            (props.name ?? "")
         ) {
           return;
         }
-      }
-    }
 
-    await navigator.clipboard.writeText(
-        text,
-    );
+        await onUpdate({
+          name: next,
+        });
+      };
 
-    setCopied(true);
+  const saveNotes =
+      async () => {
+        const next =
+            notes.trim();
 
-    window.setTimeout(
-        () => setCopied(false),
-        1500,
-    );
-  };
+        if (
+            next ===
+            (props.notes ?? "")
+        ) {
+          return;
+        }
+
+        await onUpdate({
+          notes: next,
+        });
+      };
+
+  const copyReference =
+      async () => {
+        await navigator.clipboard
+            .writeText(
+                props.cadastral_ref,
+            );
+
+        setCopied(true);
+
+        window.setTimeout(
+            () =>
+                setCopied(false),
+            1500,
+        );
+      };
+
+  const shareParcel =
+      async () => {
+        const title =
+            props.name?.trim() ||
+            "Parcela";
+
+        const text =
+            `${title}\nReferencia catastral: ${props.cadastral_ref}`;
+
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title:
+                  `${title} · Catastro Digital`,
+              text,
+            });
+
+            return;
+          } catch (error) {
+            if (
+                error instanceof
+                DOMException &&
+                error.name ===
+                "AbortError"
+            ) {
+              return;
+            }
+          }
+        }
+
+        await navigator.clipboard
+            .writeText(text);
+
+        setCopied(true);
+
+        window.setTimeout(
+            () =>
+                setCopied(false),
+            1500,
+        );
+      };
 
   const openOnMap = () => {
     onCenter();
@@ -211,14 +748,15 @@ export function ParcelInspector({
   return (
       <>
         {/* ===============================================================
-          DESKTOP — existing inspector preserved
+          DESKTOP
           =============================================================== */}
         <section className="parcel-inspector parcel-inspector-desktop">
           <div className="inspector-heading">
             <div>
-            <span className="eyebrow">
-              Parcela seleccionada
-            </span>
+              <span className="eyebrow">
+                Parcela seleccionada
+              </span>
+
               <h2>
                 {props.name?.trim() ||
                     "Sin nombre"}
@@ -246,23 +784,26 @@ export function ParcelInspector({
             <code>
               {props.cadastral_ref}
             </code>
+
             <span>
-            {copied ? (
-                "Copiada"
-            ) : (
-                <CopyIcon />
-            )}
-          </span>
+              {copied
+                  ? "Copiada"
+                  : <CopyIcon />}
+            </span>
           </button>
 
           <div className="parcel-metrics">
             <div className="metric-card metric-primary">
-              <span>Superficie</span>
+              <span>
+                Superficie
+              </span>
+
               <strong>
                 {formatHectares(
                     props.area_ha,
                 )}
               </strong>
+
               <small>
                 {props.area_m2 == null
                     ? "—"
@@ -274,13 +815,18 @@ export function ParcelInspector({
             </div>
 
             <div className="metric-card">
-              <span>Perímetro</span>
+              <span>
+                Perímetro
+              </span>
+
               <strong>
                 <RulerIcon />
+
                 {formatDistance(
                     props.perimeter_m,
                 )}
               </strong>
+
               <small>
                 contorno catastral
               </small>
@@ -289,7 +835,10 @@ export function ParcelInspector({
 
           <div className="inspector-fields">
             <label className="field">
-              <span>Nombre</span>
+              <span>
+                Nombre
+              </span>
+
               <input
                   value={name}
                   onChange={(event) =>
@@ -302,22 +851,31 @@ export function ParcelInspector({
                   }
                   onKeyDown={(event) => {
                     if (
-                        event.key === "Enter"
+                        event.key ===
+                        "Enter"
                     ) {
-                      event.currentTarget.blur();
+                      event
+                          .currentTarget
+                          .blur();
                     }
                   }}
                   placeholder="Nombre de la parcela"
-                  disabled={props.is_deleted}
+                  disabled={
+                    props.is_deleted
+                  }
               />
             </label>
 
             <div className="field-grid">
               <label className="field">
-                <span>Grupo</span>
+                <span>
+                  Grupo
+                </span>
+
                 <select
                     value={
-                        props.group_id ?? ""
+                        props.group_id ??
+                        ""
                     }
                     disabled={
                       props.is_deleted
@@ -325,7 +883,8 @@ export function ParcelInspector({
                     onChange={(event) =>
                         void onUpdate({
                           group_id:
-                          event.target.value,
+                          event.target
+                              .value,
                         })
                     }
                 >
@@ -336,8 +895,12 @@ export function ParcelInspector({
                   {groups.map(
                       (group) => (
                           <option
-                              value={group.id}
-                              key={group.id}
+                              value={
+                                group.id
+                              }
+                              key={
+                                group.id
+                              }
                           >
                             {group.name}
                           </option>
@@ -347,38 +910,41 @@ export function ParcelInspector({
               </label>
 
               <label className="field color-field">
-                <span>Color</span>
+                <span>
+                  Color
+                </span>
 
                 <span className="color-control">
-                <input
-                    type="color"
-                    value={(
-                        props.color ??
-                        DEFAULT_PARCEL_COLOR
-                    ).toLowerCase()}
-                    disabled={
-                      props.is_deleted
-                    }
-                    onChange={(event) =>
-                        void onUpdate({
-                          color:
-                          event.target.value,
-                        })
-                    }
-                />
+                  <input
+                      type="color"
+                      value={(
+                          props.color ??
+                          DEFAULT_PARCEL_COLOR
+                      ).toLowerCase()}
+                      disabled={
+                        props.is_deleted
+                      }
+                      onChange={(event) =>
+                          void onUpdate({
+                            color:
+                            event.target
+                                .value,
+                          })
+                      }
+                  />
 
-                <code>
-                  {props.color ??
-                      DEFAULT_PARCEL_COLOR}
-                </code>
-              </span>
+                  <code>
+                    {props.color ??
+                        DEFAULT_PARCEL_COLOR}
+                  </code>
+                </span>
               </label>
             </div>
 
             <label className="field notes-field">
-            <span>
-              Notas del terreno
-            </span>
+              <span>
+                Notas del terreno
+              </span>
 
               <textarea
                   value={notes}
@@ -399,6 +965,16 @@ export function ParcelInspector({
             </label>
           </div>
 
+          <ParcelUnitsEditor
+              cadastralRef={
+                props.cadastral_ref
+              }
+              isGuest={isGuest}
+              isDeleted={
+                props.is_deleted
+              }
+          />
+
           <div className="inspector-actions">
             <button
                 type="button"
@@ -415,7 +991,8 @@ export function ParcelInspector({
                     className="restore-button"
                     onClick={() =>
                         void onUpdate({
-                          is_deleted: false,
+                          is_deleted:
+                              false,
                         })
                     }
                 >
@@ -426,7 +1003,9 @@ export function ParcelInspector({
                 <button
                     type="button"
                     className="danger-button"
-                    onClick={deleteParcel}
+                    onClick={
+                      deleteParcel
+                    }
                 >
                   <TrashIcon />
                   Borrar
@@ -436,7 +1015,7 @@ export function ParcelInspector({
         </section>
 
         {/* ===============================================================
-          MOBILE — mockup-inspired parcel detail
+          MOBILE
           =============================================================== */}
         <section className="parcel-detail-mobile">
           <header className="mobile-detail-header">
@@ -475,9 +1054,12 @@ export function ParcelInspector({
                     }
                     onKeyDown={(event) => {
                       if (
-                          event.key === "Enter"
+                          event.key ===
+                          "Enter"
                       ) {
-                        event.currentTarget.blur();
+                        event
+                            .currentTarget
+                            .blur();
                       }
                     }}
                     placeholder="Sin nombre"
@@ -487,8 +1069,10 @@ export function ParcelInspector({
                 />
 
                 <span className="mobile-detail-statusline">
-                {props.is_deleted ? "Parcela archivada" : "Parcela activa"}
-              </span>
+                  {props.is_deleted
+                      ? "Parcela archivada"
+                      : "Parcela activa"}
+                </span>
 
                 <button
                     type="button"
@@ -497,9 +1081,9 @@ export function ParcelInspector({
                         void copyReference()
                     }
                 >
-                <span>
-                  Referencia catastral
-                </span>
+                  <span>
+                    Referencia catastral
+                  </span>
 
                   <code>
                     {props.cadastral_ref}
@@ -510,18 +1094,19 @@ export function ParcelInspector({
               </div>
 
               <label className="mobile-detail-group">
-              <span
-                  className="mobile-group-color"
-                  style={{
-                    background:
-                        props.color ??
-                        DEFAULT_PARCEL_COLOR,
-                  }}
-              />
+                <span
+                    className="mobile-group-color"
+                    style={{
+                      background:
+                          props.color ??
+                          DEFAULT_PARCEL_COLOR,
+                    }}
+                />
 
                 <select
                     value={
-                        props.group_id ?? ""
+                        props.group_id ??
+                        ""
                     }
                     disabled={
                       props.is_deleted
@@ -530,7 +1115,8 @@ export function ParcelInspector({
                     onChange={(event) =>
                         void onUpdate({
                           group_id:
-                          event.target.value,
+                          event.target
+                              .value,
                         })
                     }
                 >
@@ -541,8 +1127,12 @@ export function ParcelInspector({
                   {groups.map(
                       (group) => (
                           <option
-                              value={group.id}
-                              key={group.id}
+                              value={
+                                group.id
+                              }
+                              key={
+                                group.id
+                              }
                           >
                             {group.name}
                           </option>
@@ -554,65 +1144,71 @@ export function ParcelInspector({
 
             <div className="mobile-detail-metrics">
               <div>
-              <span className="mobile-metric-icon">
-                <AreaIcon />
-              </span>
+                <span className="mobile-metric-icon">
+                  <AreaIcon />
+                </span>
 
                 <span>
-                <small>
-                  Superficie
-                </small>
+                  <small>
+                    Superficie
+                  </small>
 
-                <strong>
-                  {props.area_m2 == null
-                      ? "—"
-                      : `${formatNumber(
-                          props.area_m2,
-                          0,
-                      )} m²`}
-                </strong>
+                  <strong>
+                    {props.area_m2 == null
+                        ? "—"
+                        : `${formatNumber(
+                            props.area_m2,
+                            0,
+                        )} m²`}
+                  </strong>
 
-                <em>
-                  {formatHectares(
-                      props.area_ha,
-                  )}
-                </em>
-              </span>
+                  <em>
+                    {formatHectares(
+                        props.area_ha,
+                    )}
+                  </em>
+                </span>
               </div>
 
               <div>
-              <span className="mobile-metric-icon">
-                <RulerIcon />
-              </span>
+                <span className="mobile-metric-icon">
+                  <RulerIcon />
+                </span>
 
                 <span>
-                <small>
-                  Perímetro
-                </small>
+                  <small>
+                    Perímetro
+                  </small>
 
-                <strong>
-                  {formatDistance(
-                      props.perimeter_m,
-                  )}
-                </strong>
+                  <strong>
+                    {formatDistance(
+                        props.perimeter_m,
+                    )}
+                  </strong>
 
-                <em>
-                  Contorno catastral
-                </em>
-              </span>
+                  <em>
+                    Contorno catastral
+                  </em>
+                </span>
               </div>
             </div>
 
             <div className="mobile-detail-info">
               <div>
-                <span>Grupo</span>
+                <span>
+                  Grupo
+                </span>
+
                 <strong>
                   {groupName}
                 </strong>
               </div>
 
               <div>
-                <span>Estado</span>
+                <span>
+                  Estado
+                </span>
+
                 <strong>
                   {props.is_deleted
                       ? "Borrada"
@@ -621,7 +1217,9 @@ export function ParcelInspector({
               </div>
 
               <div>
-                <span>Color</span>
+                <span>
+                  Color
+                </span>
 
                 <label className="mobile-color-inline">
                   <input
@@ -636,7 +1234,8 @@ export function ParcelInspector({
                       onChange={(event) =>
                           void onUpdate({
                             color:
-                            event.target.value,
+                            event.target
+                                .value,
                           })
                       }
                   />
@@ -649,31 +1248,43 @@ export function ParcelInspector({
               </div>
             </div>
 
+            <ParcelUnitsEditor
+                cadastralRef={
+                  props.cadastral_ref
+                }
+                isGuest={isGuest}
+                isDeleted={
+                  props.is_deleted
+                }
+            />
+
             <label className="mobile-detail-notes">
-            <span className="mobile-notes-icon">
-              <NoteIcon />
-            </span>
+              <span className="mobile-notes-icon">
+                <NoteIcon />
+              </span>
 
               <span className="mobile-notes-copy">
-              <strong>Notas</strong>
+                <strong>
+                  Notas
+                </strong>
 
-              <textarea
-                  value={notes}
-                  onChange={(event) =>
-                      setNotes(
-                          event.target.value,
-                      )
-                  }
-                  onBlur={() =>
-                      void saveNotes()
-                  }
-                  placeholder="Añade accesos, cultivos, muros, caminos u observaciones…"
-                  maxLength={4000}
-                  disabled={
-                    props.is_deleted
-                  }
-              />
-            </span>
+                <textarea
+                    value={notes}
+                    onChange={(event) =>
+                        setNotes(
+                            event.target.value,
+                        )
+                    }
+                    onBlur={() =>
+                        void saveNotes()
+                    }
+                    placeholder="Añade accesos, cultivos, muros, caminos u observaciones…"
+                    maxLength={4000}
+                    disabled={
+                      props.is_deleted
+                    }
+                />
+              </span>
             </label>
 
             <div className="mobile-detail-actions">
@@ -685,6 +1296,7 @@ export function ParcelInspector({
                   }
               >
                 <ShareIcon />
+
                 {copied
                     ? "Copiado"
                     : "Compartir"}
@@ -693,7 +1305,9 @@ export function ParcelInspector({
               <button
                   type="button"
                   className="mobile-map-button"
-                  onClick={openOnMap}
+                  onClick={
+                    openOnMap
+                  }
               >
                 <MapArrowIcon />
                 Ver en mapa
@@ -706,7 +1320,8 @@ export function ParcelInspector({
                       type="button"
                       onClick={() =>
                           void onUpdate({
-                            is_deleted: false,
+                            is_deleted:
+                                false,
                           })
                       }
                   >
@@ -716,7 +1331,9 @@ export function ParcelInspector({
               ) : (
                   <button
                       type="button"
-                      onClick={deleteParcel}
+                      onClick={
+                        deleteParcel
+                      }
                   >
                     <TrashIcon />
                     Mover a borradas
